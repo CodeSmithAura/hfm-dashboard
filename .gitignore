@@ -12,3 +12,7 @@ data/
 __pycache__/
 .venv/
 .pytest_cache/
+# Build artefacts
+*.egg-info/
+build/
+dist/

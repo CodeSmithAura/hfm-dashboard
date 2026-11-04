@@ -154,6 +154,9 @@ scoring:
   node_points: { up: 100, degraded: 50, down: 0 }   # ASSUMED Q22
   multi_node_mode: node_share            # CONFIRMED Q27 - degraded and reduced by node share
   overall: weighted_average              # weights from criticality_weights
+  unknown_nodes: exclude                 # ASSUMED Q53 - a node whose checks cannot run is left out of the
+                                         # node share (count_as_down = score it as Down instead); a node with
+                                         # one Unknown check and no failed check is Unknown
   hard_dependency_cap_pct: 0             # ASSUMED Q28 - overall score when a hard dependency is Down
   bands:                                 # ASSUMED Q29
     green_min_pct: 95
