@@ -1,0 +1,14 @@
+# Real environment values and secrets never enter the repository
+config/environments.yaml
+config/owners.yaml
+*.local.yaml
+.env
+# Discovery raw output (contains real names)
+hfm_discovery_*/
+# Runtime data
+data/
+*.sqlite
+*.db
+__pycache__/
+.venv/
+.pytest_cache/

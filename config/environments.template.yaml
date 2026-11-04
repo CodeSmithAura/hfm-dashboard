@@ -1,0 +1,147 @@
+# HFM Availability Dashboard - environment configuration TEMPLATE
+#
+# This template is the only version kept in the code repository and shared documents.
+# On each target environment:
+#   1. Copy it to environments.yaml (that file is git-ignored and never shared).
+#   2. Replace every {{PLACEHOLDER}} with the real value for that environment.
+#   3. Put credentials in the environment's secret store under the secret names below.
+#      Credentials are never written in this file, in environments.yaml, or in code.
+#
+# The program refuses to start if any {{PLACEHOLDER}} is left unfilled in environments.yaml.
+#
+# Service names are given PER NODE: in production each EPM instance has its own suffix
+# (EPMWEB1/EPMWEB2, EPMHFM1/2/3), so the same component has a different service name on each server.
+# Values marked "discovered" were read by the discovery script (production 3 Nov, non-prod 27 Oct / 3 Nov).
+# Ports stay as placeholders here and are filled in environments.yaml on the server only.
+
+environments:
+
+  PROD:
+    display_name: "Production"
+    notices_enabled: true            # email notices to component owners
+    timezone_note: "Servers do not share one time zone (two HFM nodes differ); the dashboard stores all times in UTC"
+
+    load_balancer:
+      url: "{{LB_URL}}"
+      paths:                         # discovered from OHS routing on both web nodes
+        workspace: "/workspace/"
+        hfm_web: "/hfmadf/"
+        fr_web: "/hr/"
+
+    nodes:
+      db_node_01:  { host: "{{DB_NODE_01}}",  role: database }
+      web_node_01: { host: "{{WEB_NODE_01}}", role: web }      # hosts the WebLogic Admin Server (discovered)
+      web_node_02: { host: "{{WEB_NODE_02}}", role: web }
+      hfm_node_01: { host: "{{HFM_NODE_01}}", role: hfm }
+      hfm_node_02: { host: "{{HFM_NODE_02}}", role: hfm }
+      hfm_node_03: { host: "{{HFM_NODE_03}}", role: hfm }
+
+    ports:                           # same on both web nodes (discovered); fill in on the server
+      ohs_http: "{{OHS_HTTP_PORT}}"
+      ohs_https: "{{OHS_HTTPS_PORT}}"
+      wls_admin: "{{WLS_ADMIN_PORT}}"           # not set explicitly in config.xml, so WebLogic's default applies
+      foundation: "{{FOUNDATION_PORT}}"         # FoundationServices0/1 managed servers
+      hfm_web: "{{HFM_WEB_PORT}}"               # HFMWeb0/1
+      fr_web: "{{FR_WEB_PORT}}"                 # FinancialReporting0/1
+      sql: "{{SQL_PORT}}"
+
+    services:                        # Windows service name on each node (Q15) - all discovered 3 Nov
+      ohs_load_balancer:
+        web_node_01: "OHS"
+        web_node_02: "OHS"
+      ohs_node_manager:
+        web_node_01: "Oracle Weblogic ohs NodeManager (D_Oracle_Middleware_ohs_wlserver)"
+        web_node_02: "Oracle Weblogic ohs NodeManager (D_Oracle_Middleware_ohs_wlserver)"
+      admin_server:
+        web_node_01: "Oracle Weblogic EPMSystem_AdminServer"
+      shared_services:
+        web_node_01: "HyS9FoundationServices_EPMWEB1"
+        web_node_02: "HyS9FoundationServices_EPMWEB2"
+      hfm_web:
+        web_node_01: "HyS9FinancialManagementWeb_EPMWEB1"
+        web_node_02: "HyS9FinancialManagementWeb_EPMWEB2"
+      fr_web:
+        web_node_01: "HyS9FRReports_EPMWEB1"
+        web_node_02: "HyS9FRReports_EPMWEB2"
+      epmhfm:
+        hfm_node_01: "HyS9FinancialManagementJavaServer_EPMHFM1"
+        hfm_node_02: "HyS9FinancialManagementJavaServer_EPMHFM2"
+        hfm_node_03: "HyS9FinancialManagementJavaServer_EPMHFM3"
+      sql_server:
+        db_node_01: "MSSQLSERVER"
+      sql_agent:
+        db_node_01: "SQLSERVERAGENT"
+      # fr_rmi: no separate FR RMI service exists in production or non-prod (Q07)
+
+    databases:                       # EPM databases on the SQL Server instance (discovered from WebLogic data sources)
+      - HSS                          # Shared Services / EPM registry
+      - HFM                          # HFM application data
+      - EPMRCU                       # WebLogic / OPSS repository schemas
+
+    notices:
+      smtp_relay: "{{SMTP_RELAY}}"
+      from_address: "{{NOTICE_FROM_ADDRESS}}"
+      # owner and escalation addresses per component come from the owner list (Q32)
+
+    # Secret names only - values live in the environment's secret store
+    secrets:
+      windows_monitor_account: "hfm-mon/PROD/winrm"
+      weblogic_monitor_user: "hfm-mon/PROD/weblogic"
+      sql_monitor_login: "hfm-mon/PROD/sql"
+      synthetic_test_user: "hfm-mon/PROD/synthetic-user"
+      new_relic_api_key: "hfm-mon/PROD/newrelic"
+
+  # Non-production (development): ONE web node, ONE HFM node, ONE SQL Server node (discovered).
+  # Service names carry no numeric suffix here. Duplicate this block for any other non-prod environment (Q44).
+  NONPROD:
+    display_name: "Non-Production (Development)"
+    notices_enabled: false           # pending decision on non-prod alerting (Q45)
+
+    load_balancer:
+      url: "{{NP_LB_URL}}"
+      paths:
+        workspace: "/workspace/"
+        hfm_web: "/hfmadf/"
+        fr_web: "/hr/"
+
+    nodes:
+      db_node_01:  { host: "{{NP_DB_NODE_01}}",  role: database }
+      web_node_01: { host: "{{NP_WEB_NODE_01}}", role: web }
+      hfm_node_01: { host: "{{NP_HFM_NODE_01}}", role: hfm }
+
+    ports:
+      ohs_http: "{{NP_OHS_HTTP_PORT}}"
+      ohs_https: "{{NP_OHS_HTTPS_PORT}}"
+      wls_admin: "{{NP_WLS_ADMIN_PORT}}"
+      foundation: "{{NP_FOUNDATION_PORT}}"
+      hfm_web: "{{NP_HFM_WEB_PORT}}"
+      fr_web: "{{NP_FR_WEB_PORT}}"
+      sql: "{{NP_SQL_PORT}}"
+
+    services:                        # all discovered on the development hosts
+      ohs_load_balancer: { web_node_01: "OHS" }
+      ohs_node_manager: { web_node_01: "Oracle Weblogic ohs NodeManager (D_Oracle_Middleware_ohs_wlserver)" }
+      admin_server:     { web_node_01: "Oracle Weblogic EPMSystem_AdminServer" }
+      shared_services:  { web_node_01: "HyS9FoundationServices_EPMWEB" }
+      hfm_web:          { web_node_01: "HyS9FinancialManagementWeb_EPMWEB" }
+      fr_web:           { web_node_01: "HyS9FRReports_EPMWEB" }
+      epmhfm:           { hfm_node_01: "HyS9FinancialManagementJavaServer_EPMHFM" }
+      sql_server:       { db_node_01: "MSSQLSERVER" }
+      sql_agent:        { db_node_01: "SQLSERVERAGENT" }
+
+    databases: [HSS, HFM, EPMRCU]
+
+    notices:
+      smtp_relay: "{{SMTP_RELAY}}"
+      from_address: "{{NOTICE_FROM_ADDRESS}}"
+
+    secrets:
+      windows_monitor_account: "hfm-mon/NONPROD/winrm"
+      weblogic_monitor_user: "hfm-mon/NONPROD/weblogic"
+      sql_monitor_login: "hfm-mon/NONPROD/sql"
+      synthetic_test_user: "hfm-mon/NONPROD/synthetic-user"
+      new_relic_api_key: "hfm-mon/NONPROD/newrelic"
+
+monitoring:
+  monitor_host: "{{MONITOR_HOST}}"
+  # Polling, thresholds, scoring and notice timings live in rules.yaml (single source)

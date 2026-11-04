@@ -1,0 +1,200 @@
+# HFM Availability Dashboard - health, scoring and notice RULES
+#
+# Every rule the program applies is defined here, not in code. To change behaviour,
+# edit this file and restart the service; no code change or redeploy is needed.
+#
+# Each value carries a "basis" so anyone can see where it came from:
+#   CONFIRMED <Qnn>  - answered by the application team in the query log
+#   ASSUMED   <Qnn>  - no answer yet; working assumption, replace when answered
+#
+# The program validates this file at start-up (unknown keys, missing components,
+# weights out of range) and refuses to start on an invalid file.
+
+version: 1
+
+# ---------------------------------------------------------------------------
+# 1. Check status rules: how a single check on a single node becomes Up / Degraded / Down
+# ---------------------------------------------------------------------------
+checks:
+
+  windows_service:                       # basis: ASSUMED Q22
+    up: [Running]
+    degraded: [StartPending, StopPending, ContinuePending, PausePending, Paused]
+    down: [Stopped, NotFound]
+
+  url_probe:                             # basis: ASSUMED Q23 (response times)
+    timeout_seconds: 60
+    down_on_http_status: [500, 502, 503, 504]
+    degraded_after_seconds:
+      workspace_login: 10
+      hfm_web: 15
+      fr_web: 30
+
+  weblogic_server:                       # basis: ASSUMED Q22; stuck-thread time CONFIRMED Q22
+    up: [RUNNING]
+    degraded: [WARNING, ADMIN, RESUMING, SUSPENDING]
+    down: [FAILED, SHUTDOWN, FORCE_SHUTTING_DOWN, UNKNOWN]
+    stuck_thread_max_time_seconds: 3600  # CONFIRMED Q22 - WebLogic reports a thread stuck after this
+    degraded_if_stuck_threads_above: 0
+    degraded_if_heap_used_pct_above: 90
+
+  sql_server:                            # basis: checks CONFIRMED Q14, thresholds ASSUMED Q14
+    down_if_service_not_running: true
+    degraded_if_blocking_longer_than_minutes: 5
+    degraded_if_deadlocks_in_15_min_above: 5
+    degraded_if_log_used_pct_above: 90
+    degraded_if_tempdb_used_pct_above: 90
+    degraded_if_disk_free_pct_below: 10
+    down_if_disk_free_pct_below: 3
+    degraded_if_backup_failed_in_last_hours: 24
+    degraded_if_agent_job_failed_in_last_hours: 24
+    degraded_if_query_running_longer_than_minutes: 60   # consolidations can be long; tune after shadow mode
+
+  # Flap protection: a node is only marked Down after this many consecutive failed polls
+  confirm_down_after_consecutive_failures: 2   # basis: ASSUMED Q40
+
+# ---------------------------------------------------------------------------
+# 2. Components: what is monitored, on which nodes, and how much it matters
+#    Node keys refer to environments.yaml (web_node_01, hfm_node_01, ...)
+# ---------------------------------------------------------------------------
+criticality_weights:                     # basis: ASSUMED Q26
+  critical: 4
+  high: 3
+  medium: 2
+  low: 1
+
+components:
+
+  sql_server:
+    display_name: "SQL Server"
+    nodes: [db_node_01]
+    checks: [windows_service, sql_server]
+    criticality: critical                # ASSUMED Q26
+    hard_dependency: true                # ASSUMED Q28
+    single_point_of_failure: true        # Q12 CONFIRMED by discovery: production and non-prod are standalone (no Always On, no failover cluster)
+
+  sql_agent:
+    display_name: "SQL Server Agent"
+    nodes: [db_node_01]
+    checks: [windows_service]
+    criticality: medium                  # ASSUMED Q26 - runs backups and jobs; no direct user impact
+                                         # Production Agent is set to Manual start (Auto in non-prod): flagged to the DBA
+    hard_dependency: false
+
+  # Discovery (production 3 Nov; non-prod 27 Oct / 3 Nov): Foundation, HFM Web and FR Web run as THREE separate
+  # Windows services / WebLogic managed servers, so each can fail on its own.
+  # All EPM services are set to Manual start: after a server reboot they stay down
+  # until the start-up script is run, so a reboot shows as Down until then.
+  # Node Manager has CrashRecoveryEnabled=false, so WebLogic does not restart crashed servers either (Q08).
+  # Each runs as its own WebLogic cluster with one managed server per web node (active-active, Q06).
+  # Windows service names differ per node in production (EPMWEB1/2, EPMHFM1/2/3): see environments.template.yaml.
+
+  shared_services:
+    display_name: "Foundation / Shared Services (Workspace)"
+    nodes: [web_node_01, web_node_02]
+    checks: [windows_service, weblogic_server, url_probe:workspace_login]   # service VERIFIED (discovery)
+    criticality: critical                # ASSUMED Q26
+    hard_dependency: true                # ASSUMED Q28 - nobody can log in without it
+
+  ohs_load_balancer:
+    display_name: "Oracle HTTP Server / Load balancer"
+    nodes: [web_node_01, web_node_02]
+    checks: [windows_service]
+    lb_probe: true                       # CONFIRMED Q05 - also probe through the LB URL
+    criticality: critical                # ASSUMED Q26
+    hard_dependency: true                # ASSUMED Q28 - applies only when ALL nodes are down
+
+  epmhfm:
+    display_name: "HFM Server (cluster)"
+    nodes: [hfm_node_01, hfm_node_02, hfm_node_03]   # CONFIRMED Q09 - one cluster, all apps on every node
+    checks: [windows_service]            # service HyS9FinancialManagementJavaServer_EPMHFM VERIFIED (non-prod)
+    criticality: critical                # ASSUMED Q26
+    hard_dependency: false
+
+  hfm_web:
+    display_name: "HFM Web"
+    nodes: [web_node_01, web_node_02]    # CONFIRMED Q06 - active-active
+    checks: [windows_service, url_probe:hfm_web]   # service VERIFIED (discovery)
+    # Note: production OHS routes /oracle-epm-fm-webservices to web node 2 only (Q50), so HFM web
+    # services depend on that one node even though /hfmadf is balanced across both.
+    criticality: high                    # ASSUMED Q26
+
+  fr_web:
+    display_name: "Financial Reporting Web"
+    nodes: [web_node_01, web_node_02]
+    checks: [windows_service, url_probe:fr_web]    # service VERIFIED (discovery)
+    criticality: medium                  # ASSUMED Q26
+
+  fr_rmi:
+    enabled: false                       # Q07 CORRECTED by discovery: no separate FR RMI service exists on any
+                                         # production or non-prod server. Kept here, disabled, for reference.
+    display_name: "Financial Reporting RMI"
+    nodes: [web_node_01, web_node_02]
+    checks: [windows_service]
+    criticality: medium                  # ASSUMED Q26
+
+  admin_server:
+    display_name: "WebLogic Admin Server"
+    nodes: [web_node_01]                 # CONFIRMED Q04, VERIFIED on production web node 1
+    checks: [windows_service, weblogic_server]
+    criticality: low                     # ASSUMED Q26 - control plane, no direct user impact
+
+  ohs_node_manager:
+    display_name: "WebLogic Node Manager (OHS domain)"   # discovery: only the OHS domain has a Node Manager service
+    nodes: [web_node_01, web_node_02]
+    checks: [windows_service]
+    criticality: low                     # CONFIRMED Q08 - manual mode, used for scripted startup
+
+  # lcm: removed - no scheduled LCM jobs (CONFIRMED Q25)
+
+# ---------------------------------------------------------------------------
+# 3. Scoring: node -> component -> overall stability score
+# ---------------------------------------------------------------------------
+scoring:
+  node_points: { up: 100, degraded: 50, down: 0 }   # ASSUMED Q22
+  multi_node_mode: node_share            # CONFIRMED Q27 - degraded and reduced by node share
+  overall: weighted_average              # weights from criticality_weights
+  hard_dependency_cap_pct: 0             # ASSUMED Q28 - overall score when a hard dependency is Down
+  bands:                                 # ASSUMED Q29
+    green_min_pct: 95
+    amber_min_pct: 70                    # below amber_min_pct = Red
+
+# ---------------------------------------------------------------------------
+# 4. Caution notices
+# ---------------------------------------------------------------------------
+notices:
+  channel: email                         # CONFIRMED Q33 - email only, no tickets
+  first_notice_after_minutes: 15         # CONFIRMED Q34 (reading to be confirmed, Q46)
+  first_notice_after_minutes_close: 5    # CONFIRMED Q31
+  repeat_every_minutes: 30               # ASSUMED Q46
+  escalate_to_manager_after_minutes: 60  # ASSUMED Q46
+  notify_on_degraded: false              # ASSUMED Q22 - Degraded shows on dashboard only
+  send_recovery_notice: true             # ASSUMED Q37
+  require_acknowledgement: false         # ASSUMED Q37
+  group_downstream_under_root_cause: true   # ASSUMED Q28 - when a hard dependency is Down, one notice
+  include_restart_guidance: true         # ASSUMED Q35 - start order taken from the start-up scripts
+  auto_restart: false                    # ASSUMED Q38 - notify only
+  owners_file: owners.yaml               # filled from the owner list (Q32); kept out of the repository
+
+close_calendar:                          # ASSUMED Q46 - which days use first_notice_after_minutes_close
+  business_days_before_month_end: 2
+  business_days_after_month_start: 7
+  quarter_end_months: [3, 6, 9, 12]
+  extra_dates: []                        # add specific close dates here, YYYY-MM-DD
+
+maintenance:
+  suppress_notices_in_window: true       # ASSUMED Q36 - windows entered on the dashboard
+  show_on_dashboard_as: "Maintenance"
+
+# ---------------------------------------------------------------------------
+# 5. Collection and history
+# ---------------------------------------------------------------------------
+collection:
+  poll_interval_seconds: 60              # ASSUMED Q40 - needed to meet 5-min close alerting
+  store_times_in: UTC                    # servers run in different time zones (two HFM nodes differ), so all times are normalised to UTC
+  history_retention_days: 90             # ASSUMED Q40
+  history_views_enabled: false           # CONFIRMED Q30 - nice to have, switch on later
+
+environments:
+  PROD:    { notices_enabled: true }
+  NONPROD: { notices_enabled: false }    # ASSUMED Q45 - dashboard only until decided
