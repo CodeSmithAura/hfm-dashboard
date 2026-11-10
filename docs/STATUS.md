@@ -21,7 +21,7 @@ Last updated: 10 Nov 2026
     I/O libraries out of the domain. Setup steps in README.
   - New rules key `scoring.unknown_nodes` (ASSUMED Q53) and query Q53 added to the query log.
   - Design decisions D12-D16 recorded in `docs/decisions.md`.
-  - Committed on `feature/slice1-status-scoring`.
+  - Committed (`b5f03ae`).
 - Slice 2 (10 Nov): check evaluation, 211 tests passing.
   - `domain/evaluation.py` (pure): typed observations per check type (service state, URL probe,
     WebLogic runtime, SQL Server metrics) -> Up / Degraded / Down / Unknown with a reason, all
@@ -48,23 +48,35 @@ Last updated: 10 Nov 2026
   - Sample responses in `tests/fixtures/winrm/` are synthetic (script output format); replace with
     masked recordings from the development servers when access allows.
   - Not run against a real server yet (needs A06-A08, or permitted development access).
+  - Committed (`dec29de`).
+
+### Git
+- Slices 1-4 are on branch `feature/build1-core` (renamed from `feature/slice1-status-scoring`),
+  4 commits on top of `main`. Not yet pushed: the first push needs an interactive GitHub sign-in
+  on this workstation (`git push -u origin feature/build1-core`).
+- From slice 5 on: one branch per slice, started from `feature/build1-core`; commit only after review.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
-- Slice 4 not committed yet: needs review and a commit.
+- Masked sample outputs: being gathered in the client environment (this workstation has no server
+  access). Run the read-only `Get-Service` script from `adapters/winrm_services.py` on a development
+  node with the NONPROD service names; mask host and account names; save the JSON under
+  `tests/fixtures/winrm/` to replace the synthetic samples.
 - Q53 (how Unknown nodes are scored) and Q54 (healthy HTTP codes) waiting for the application team.
 - Dev environment note: on this workstation Python 3.12 and git are not on PATH in new shells; use
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
-### Next steps
-1. Commit slice 4 after review.
-2. Small command-line check to run the services collector against the development servers (where
-   permitted) and record masked sample responses.
-3. Next collectors, each with a fake and samples: WebLogic REST (state, stuck threads, heap), URL probes
+### Next steps (resume here)
+1. Push `feature/build1-core` (after sign-in) and open a pull request to `main`.
+2. When masked outputs arrive: add them to `tests/fixtures/winrm/` and parse tests against them; fix
+   the adapter if the real output differs from the synthetic format.
+3. Slice 5: small command-line check to run the services collector against the development servers
+   (where permitted) and record masked sample responses. Can be built and tested without access.
+4. Next collectors, each with a fake and samples: WebLogic REST (state, stuck threads, heap), URL probes
    (httpx), SQL Server DMVs (pyodbc); then the poll loop wiring collectors -> node state -> scoring.
-4. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
+5. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
    not covered by rules.yaml yet.
-5. Tell the application team that with the current assumed weights (Q26) one HFM node down gives
+6. Tell the application team that with the current assumed weights (Q26) one HFM node down gives
    94.67% (Amber), and an Admin Server outage stays Green (96%).
 
 ## Decisions pending
