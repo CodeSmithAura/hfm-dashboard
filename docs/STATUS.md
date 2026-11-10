@@ -1,6 +1,6 @@
 # Status (update as things change)
 
-Last updated: 5 Nov 2026
+Last updated: 10 Nov 2026
 
 ## Plan
 - Target go-live: 30 Nov 2026 (production), with shadow mode from 26 Nov.
@@ -21,19 +21,29 @@ Last updated: 5 Nov 2026
     I/O libraries out of the domain. Setup steps in README.
   - New rules key `scoring.unknown_nodes` (ASSUMED Q53) and query Q53 added to the query log.
   - Design decisions D12-D16 recorded in `docs/decisions.md`.
+  - Committed on `feature/slice1-status-scoring`.
+- Slice 2 (10 Nov): check evaluation, 211 tests passing.
+  - `domain/evaluation.py` (pure): typed observations per check type (service state, URL probe,
+    WebLogic runtime, SQL Server metrics) -> Up / Degraded / Down / Unknown with a reason, all
+    thresholds from rules.yaml `checks:`.
+  - Missing metric or unlisted state -> Unknown; the current production disks (Q52) evaluate as Degraded.
+  - New rules key `checks.url_probe.up_on_http_status` (ASSUMED Q54) and query Q54 added. Decision D17.
 
 ### In progress
-- Build 1 (data collectors), planned 2-6 Nov.
-- Slice 1 is not committed yet: needs review and a commit.
-- Q53 (how Unknown nodes are scored) waiting for the application team. Current setting `exclude`.
+- Build 1 (data collectors), planned 2-6 Nov (running late).
+- Slice 2 not committed yet: needs review and a commit.
+- Q53 (how Unknown nodes are scored) and Q54 (healthy HTTP codes) waiting for the application team.
+- Dev environment note: on this workstation Python 3.12 and git are not on PATH in new shells; use
+  `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps
-1. Commit slice 1 after review.
-2. Slice 2: turn raw check results into Up / Degraded / Down using rules.yaml `checks:` (service states,
-   WebLogic states and thresholds, URL response times and HTTP codes, SQL Server thresholds).
-3. Slice 3: `environments.yaml` loader. Refuses to start on any `{{PLACEHOLDER}}`, checks that every
+1. Commit slice 2 after review.
+2. Slice 3: `environments.yaml` loader. Refuses to start on any `{{PLACEHOLDER}}`, checks that every
    rules.yaml component and node exists in the environment and has a service name per node.
-4. Slice 4: first collector, Windows services over WinRM, with a fake and masked sample responses.
+3. Slice 4: first collector, Windows services over WinRM, with a fake and masked sample responses.
+   It returns `ServiceObservation` / `CollectionFailure`; evaluation does the rest.
+4. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
+   not covered by rules.yaml yet.
 5. Tell the application team that with the current assumed weights (Q26) one HFM node down gives
    94.67% (Amber), and an Admin Server outage stays Green (96%).
 

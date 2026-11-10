@@ -30,6 +30,7 @@ _BASE: dict[str, Any] = {
         "windows_service": {"up": ["Running"], "degraded": ["Paused"], "down": ["Stopped"]},
         "url_probe": {
             "timeout_seconds": 60,
+            "up_on_http_status": [200, 302],
             "down_on_http_status": [500, 503],
             "degraded_after_seconds": {"web_login": 10},
         },

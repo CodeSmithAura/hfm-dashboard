@@ -38,7 +38,7 @@ def _require_utc(ts: datetime) -> None:
 
 @dataclass(frozen=True, slots=True)
 class CheckResult:
-    """Outcome of one check on one node in one poll, already mapped to a Status by a collector."""
+    """Outcome of one check on one node in one poll; ``status`` comes from ``evaluation.evaluate``."""
 
     component: str
     node: str

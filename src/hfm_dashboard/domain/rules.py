@@ -45,11 +45,15 @@ class WindowsServiceCheck(StateMapCheck):
 
 class UrlProbeCheck(_Strict):
     timeout_seconds: float = Field(gt=0)
+    up_on_http_status: list[int] = Field(min_length=1)   # any code in neither list = Degraded
     down_on_http_status: list[int]
     degraded_after_seconds: dict[str, float]
 
     @model_validator(mode="after")
     def _thresholds_below_timeout(self) -> UrlProbeCheck:
+        both = set(self.up_on_http_status) & set(self.down_on_http_status)
+        if both:
+            raise ValueError(f"HTTP status {sorted(both)} listed in both up_on_ and down_on_http_status")
         for probe, secs in self.degraded_after_seconds.items():
             if not 0 < secs < self.timeout_seconds:
                 raise ValueError(

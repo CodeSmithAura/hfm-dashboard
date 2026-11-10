@@ -24,6 +24,7 @@ checks:
 
   url_probe:                             # basis: ASSUMED Q23 (response times)
     timeout_seconds: 60
+    up_on_http_status: [200, 301, 302, 303, 307, 308]   # ASSUMED Q54 - any code in neither list = Degraded
     down_on_http_status: [500, 502, 503, 504]
     degraded_after_seconds:
       workspace_login: 10
