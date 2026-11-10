@@ -28,23 +28,30 @@ Last updated: 10 Nov 2026
     thresholds from rules.yaml `checks:`.
   - Missing metric or unlisted state -> Unknown; the current production disks (Q52) evaluate as Degraded.
   - New rules key `checks.url_probe.up_on_http_status` (ASSUMED Q54) and query Q54 added. Decision D17.
+  - Committed (`f2cb744`).
+- Slice 3 (10 Nov): environments.yaml loader and start-up gate, 248 tests passing.
+  - `domain/environment.py`: strict model (nodes, roles, ports 1..65535, per-node service names,
+    secret names) and cross-checks against rules.yaml; `nodes_of()` / `service_name()` for collectors.
+  - `config/environment_loader.py`: refuses any `{{PLACEHOLDER}}` left in a value, lists each by
+    path; clear error for an unquoted placeholder. `config/startup.py`: `load_configuration()` loads
+    rules.yaml then environments.yaml and refuses to start on any problem (hard rule 6).
+  - Tests fill the shipped template with invented values, proving template and rules.yaml agree.
+  - Shared strict YAML reading moved to `config/yaml_loader.py`. Decision D18.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
-- Slice 2 not committed yet: needs review and a commit.
+- Slice 3 not committed yet: needs review and a commit.
 - Q53 (how Unknown nodes are scored) and Q54 (healthy HTTP codes) waiting for the application team.
 - Dev environment note: on this workstation Python 3.12 and git are not on PATH in new shells; use
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps
-1. Commit slice 2 after review.
-2. Slice 3: `environments.yaml` loader. Refuses to start on any `{{PLACEHOLDER}}`, checks that every
-   rules.yaml component and node exists in the environment and has a service name per node.
-3. Slice 4: first collector, Windows services over WinRM, with a fake and masked sample responses.
+1. Commit slice 3 after review.
+2. Slice 4: first collector, Windows services over WinRM, with a fake and masked sample responses.
    It returns `ServiceObservation` / `CollectionFailure`; evaluation does the rest.
-4. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
+3. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
    not covered by rules.yaml yet.
-5. Tell the application team that with the current assumed weights (Q26) one HFM node down gives
+4. Tell the application team that with the current assumed weights (Q26) one HFM node down gives
    94.67% (Amber), and an Admin Server outage stays Green (96%).
 
 ## Decisions pending
