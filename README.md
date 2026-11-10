@@ -18,5 +18,7 @@ py -3.12 -m venv .venv
 .venv\Scripts\python -m pytest
 ```
 
-Layout: `src/hfm_dashboard/domain` (status model, rules model, scoring - no I/O),
-`src/hfm_dashboard/config` (YAML loading), later `ports/`, `adapters/` and `app/`. Tests mirror it under `tests/`.
+Layout: `src/hfm_dashboard/domain` (status model, rules and environment models, check evaluation,
+scoring - no I/O), `config/` (YAML loading, start-up gate), `ports/` (interfaces to external
+systems), `adapters/` (WinRM, ... and their fakes), `app/` (collectors). Tests mirror it under
+`tests/`; masked sample responses live in `tests/fixtures/`.

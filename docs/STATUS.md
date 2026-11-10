@@ -37,21 +37,34 @@ Last updated: 10 Nov 2026
     rules.yaml then environments.yaml and refuses to start on any problem (hard rule 6).
   - Tests fill the shipped template with invented values, proving template and rules.yaml agree.
   - Shared strict YAML reading moved to `config/yaml_loader.py`. Decision D18.
+  - Committed (`b30e347`).
+- Slice 4 (10 Nov): Windows services collector, 291 tests passing.
+  - Port `ports/windows_services.py`; adapter `adapters/winrm_services.py` (pypsrp, read-only
+    `Get-Service`, Name then DisplayName match, gMSA identity, no stored password); fake
+    `adapters/fake_services.py`; collector `app/service_collector.py` (one query per host, in parallel,
+    per-node service names, Unknown for an unreachable host).
+  - New `winrm:` block (port placeholder, SSL, auth) in the environment template; new rules key
+    `checks.windows_service.timeout_seconds` (ASSUMED Q40). Decision D19.
+  - Sample responses in `tests/fixtures/winrm/` are synthetic (script output format); replace with
+    masked recordings from the development servers when access allows.
+  - Not run against a real server yet (needs A06-A08, or permitted development access).
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
-- Slice 3 not committed yet: needs review and a commit.
+- Slice 4 not committed yet: needs review and a commit.
 - Q53 (how Unknown nodes are scored) and Q54 (healthy HTTP codes) waiting for the application team.
 - Dev environment note: on this workstation Python 3.12 and git are not on PATH in new shells; use
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps
-1. Commit slice 3 after review.
-2. Slice 4: first collector, Windows services over WinRM, with a fake and masked sample responses.
-   It returns `ServiceObservation` / `CollectionFailure`; evaluation does the rest.
-3. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
+1. Commit slice 4 after review.
+2. Small command-line check to run the services collector against the development servers (where
+   permitted) and record masked sample responses.
+3. Next collectors, each with a fake and samples: WebLogic REST (state, stuck threads, heap), URL probes
+   (httpx), SQL Server DMVs (pyodbc); then the poll loop wiring collectors -> node state -> scoring.
+4. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
    not covered by rules.yaml yet.
-4. Tell the application team that with the current assumed weights (Q26) one HFM node down gives
+5. Tell the application team that with the current assumed weights (Q26) one HFM node down gives
    94.67% (Amber), and an Admin Server outage stays Green (96%).
 
 ## Decisions pending

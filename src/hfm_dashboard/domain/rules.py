@@ -40,7 +40,7 @@ class StateMapCheck(_Strict):
 
 
 class WindowsServiceCheck(StateMapCheck):
-    pass
+    timeout_seconds: int = Field(gt=0)   # per-host WinRM connection / operation timeout
 
 
 class UrlProbeCheck(_Strict):
@@ -229,6 +229,9 @@ class Rules(_Strict):
     def _cross_references(self) -> Rules:
         if not any(c.enabled for c in self.components.values()):
             raise ValueError("no enabled components")
+        if self.checks.windows_service.timeout_seconds >= self.collection.poll_interval_seconds:
+            raise ValueError("checks.windows_service.timeout_seconds must be below "
+                             "collection.poll_interval_seconds")
         probes = self.checks.url_probe.degraded_after_seconds
         for cid, comp in self.components.items():
             if comp.criticality not in self.criticality_weights:

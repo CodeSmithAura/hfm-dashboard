@@ -130,3 +130,19 @@ class TestHardRulesEnforced:
     def test_times_must_be_utc(self, rules_dict):
         rules_dict["collection"]["store_times_in"] = "local"
         invalid(rules_dict, "store_times_in")
+
+class TestWindowsServiceTimeout:
+    def test_must_be_below_poll_interval(self, rules_dict):
+        rules_dict["checks"]["windows_service"]["timeout_seconds"] = 60   # poll interval is 60
+        invalid(rules_dict, "below collection.poll_interval_seconds")
+
+    def test_must_be_positive(self, rules_dict):
+        rules_dict["checks"]["windows_service"]["timeout_seconds"] = 0
+        invalid(rules_dict, "timeout_seconds")
+
+    def test_required(self, rules_dict):
+        del rules_dict["checks"]["windows_service"]["timeout_seconds"]
+        invalid(rules_dict, "timeout_seconds")
+
+    def test_shipped_value(self, repo_rules):
+        assert repo_rules.checks.windows_service.timeout_seconds == 20   # ASSUMED Q40

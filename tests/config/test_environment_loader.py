@@ -21,27 +21,7 @@ from hfm_dashboard.config.environment_loader import (
 )
 from hfm_dashboard.config.startup import ConfigurationError, load_configuration
 from hfm_dashboard.domain.environment import EnvironmentsConfig, check_against_rules
-from tests.conftest import REPO_ROOT, RULES_PATH
-
-TEMPLATE_PATH = REPO_ROOT / "config" / "environments.template.yaml"
-TEMPLATE = TEMPLATE_PATH.read_text(encoding="utf-8")
-
-
-def _fake_value(name: str) -> str:
-    if name.endswith("_PORT"):
-        return "8443"
-    if name.endswith("_URL"):
-        return "https://lb.example.test"
-    if name.endswith("_ADDRESS"):
-        return "hfm-monitor@example.test"
-    return name.lower().replace("_", "-") + ".example.test"
-
-
-def fill(text: str) -> str:
-    return re.sub(r"\{\{\s*([A-Za-z0-9_]+)\s*\}\}", lambda m: _fake_value(m.group(1)), text)
-
-
-FILLED = fill(TEMPLATE)
+from tests.conftest import FILLED, RULES_PATH, TEMPLATE
 
 
 @pytest.fixture
@@ -76,8 +56,12 @@ class TestTemplate:
         for env in data["environments"].values():
             for node in env["nodes"].values():
                 assert re.fullmatch(r"\{\{[A-Z0-9_]+\}\}", node["host"])
-            for port in env["ports"].values():
+            for port in [*env["ports"].values(), env["winrm"]["port"]]:
                 assert re.fullmatch(r"\{\{[A-Z0-9_]+\}\}", port)
+
+    def test_winrm_settings(self, repo_rules):
+        winrm = parse_environments(FILLED, repo_rules).environments["PROD"].winrm
+        assert winrm.port == 8443 and winrm.auth == "negotiate" and winrm.cert_validation
 
     def test_production_service_names_differ_per_node(self, repo_rules):
         cfg = parse_environments(FILLED, repo_rules).environments["PROD"]

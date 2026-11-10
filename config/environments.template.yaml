@@ -45,6 +45,11 @@ environments:
       fr_web: "{{FR_WEB_PORT}}"                 # FinancialReporting0/1
       sql: "{{SQL_PORT}}"
 
+    winrm:                           # Windows services collector (A07, A08)
+      port: "{{WINRM_PORT}}"
+      use_ssl: false                 # HTTP listener; Negotiate/Kerberos still encrypts the payload. true for an HTTPS listener
+      auth: negotiate                # negotiate or kerberos; the service's gMSA identity is used, no password stored
+
     services:                        # Windows service name on each node (Q15) - all discovered 3 Nov
       ohs_load_balancer:
         web_node_01: "OHS"
@@ -117,6 +122,11 @@ environments:
       hfm_web: "{{NP_HFM_WEB_PORT}}"
       fr_web: "{{NP_FR_WEB_PORT}}"
       sql: "{{NP_SQL_PORT}}"
+
+    winrm:
+      port: "{{NP_WINRM_PORT}}"
+      use_ssl: false
+      auth: negotiate
 
     services:                        # all discovered on the development hosts
       ohs_load_balancer: { web_node_01: "OHS" }

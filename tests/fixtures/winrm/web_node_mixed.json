@@ -1,0 +1,1 @@
+[{"wanted":"OHS","status":"Running"},{"wanted":"Oracle Weblogic ohs NodeManager (D_Oracle_Middleware_ohs_wlserver)","status":"Stopped"},{"wanted":"HyS9FoundationServices_EPMWEB2","status":"StartPending"},{"wanted":"HyS9FinancialManagementWeb_EPMWEB2","status":"Running"},{"wanted":"HyS9FRReports_EPMWEB2","status":"NotFound"}]

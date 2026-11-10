@@ -10,6 +10,7 @@ Two kinds of rules are used:
 from __future__ import annotations
 
 import copy
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -21,13 +22,35 @@ from hfm_dashboard.domain.rules import Rules
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RULES_PATH = REPO_ROOT / "config" / "rules.yaml"
+TEMPLATE_PATH = REPO_ROOT / "config" / "environments.template.yaml"
+TEMPLATE = TEMPLATE_PATH.read_text(encoding="utf-8")
+FIXTURES = REPO_ROOT / "tests" / "fixtures"
 
 T0 = datetime(2026, 11, 4, 9, 0, tzinfo=UTC)
+
+
+def _fake_value(name: str) -> str:
+    """Invented value for a template placeholder (hard rule 1: never a real identifier)."""
+    if name.endswith("_PORT"):
+        return "8443"
+    if name.endswith("_URL"):
+        return "https://lb.example.test"
+    if name.endswith("_ADDRESS"):
+        return "hfm-monitor@example.test"
+    return name.lower().replace("_", "-") + ".example.test"
+
+
+def fill(text: str) -> str:
+    return re.sub(r"\{\{\s*([A-Za-z0-9_]+)\s*\}\}", lambda m: _fake_value(m.group(1)), text)
+
+
+FILLED = fill(TEMPLATE)
 
 _BASE: dict[str, Any] = {
     "version": 1,
     "checks": {
-        "windows_service": {"up": ["Running"], "degraded": ["Paused"], "down": ["Stopped"]},
+        "windows_service": {"up": ["Running"], "degraded": ["Paused"], "down": ["Stopped"],
+                            "timeout_seconds": 20},
         "url_probe": {
             "timeout_seconds": 60,
             "up_on_http_status": [200, 302],

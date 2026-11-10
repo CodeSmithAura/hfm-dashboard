@@ -46,6 +46,15 @@ class LoadBalancer(_Strict):
         return url.rstrip("/")
 
 
+class WinRM(_Strict):
+    """How the monitoring server reaches the nodes' WinRM listener (read-only queries only)."""
+
+    port: Port
+    use_ssl: bool
+    auth: Literal["negotiate", "kerberos"]
+    cert_validation: bool = True
+
+
 class EnvironmentNotices(_Strict):
     smtp_relay: NonEmpty
     from_address: NonEmpty
@@ -58,6 +67,7 @@ class Environment(_Strict):
     load_balancer: LoadBalancer
     nodes: dict[str, Node] = Field(min_length=1)
     ports: dict[str, Port]
+    winrm: WinRM
     services: dict[str, dict[str, NonEmpty]]   # component -> node -> Windows service name
     databases: list[NonEmpty]
     notices: EnvironmentNotices

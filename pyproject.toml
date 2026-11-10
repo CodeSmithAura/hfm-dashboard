@@ -10,10 +10,11 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "pydantic>=2.7",
     "PyYAML>=6",
+    "pypsrp>=0.8",          # WinRM / PowerShell remoting (Windows services collector)
 ]
 
 [project.optional-dependencies]
-# Added slice by slice as adapters arrive: fastapi, apscheduler, httpx, pypsrp, pyodbc, playwright
+# Added slice by slice as adapters arrive: fastapi, apscheduler, httpx, pyodbc, playwright
 dev = ["pytest>=8"]
 
 [tool.setuptools.packages.find]

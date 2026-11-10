@@ -21,6 +21,7 @@ checks:
     up: [Running]
     degraded: [StartPending, StopPending, ContinuePending, PausePending, Paused]
     down: [Stopped, NotFound]
+    timeout_seconds: 20                  # ASSUMED Q40 - per-host WinRM query; must stay below poll_interval_seconds
 
   url_probe:                             # basis: ASSUMED Q23 (response times)
     timeout_seconds: 60
