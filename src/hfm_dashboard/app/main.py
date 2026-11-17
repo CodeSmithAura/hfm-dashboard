@@ -24,6 +24,7 @@ from datetime import UTC, datetime, timedelta
 
 from hfm_dashboard.adapters.env_secrets import EnvironmentSecretStore
 from hfm_dashboard.adapters.sqlite_history import SqliteHistory
+from hfm_dashboard.app.notice_tracker import NoticeTracker
 from hfm_dashboard.app.poller import Collectors, Poller, PollSnapshot
 from hfm_dashboard.app.scheduler import build_scheduler
 from hfm_dashboard.app.wiring import build_collectors
@@ -59,6 +60,12 @@ def summarise(s: PollSnapshot) -> list[str]:
             lines.append(f"  load balancer {r.check}: {r.status.value.upper()} - {r.detail} (not scored, Q57)")
     if s.collector_errors:
         lines.append(f"  collector errors: {', '.join(s.collector_errors)}")
+    for n in s.notices:
+        since = n.since.strftime("%Y-%m-%d %H:%M UTC") if n.since else "-"
+        nodes = f"{len(n.affected_nodes)} of {n.total_nodes} node(s)" if n.affected_nodes else "all nodes"
+        extra = f"; also affected: {', '.join(n.downstream)}" if n.downstream else ""
+        lines.append(f"  NOTICE {n.kind.value}{' (+manager)' if n.escalate else ''}: {n.component} - "
+                     f"{nodes}, since {since}{extra}")
     return lines
 
 
@@ -101,7 +108,8 @@ def main(
             return 2
 
     pollers = [Poller(n, config.environments.environments[n], rules,
-                      collectors_factory(n, config.environments.environments[n], rules), history=history)
+                      collectors_factory(n, config.environments.environments[n], rules), history=history,
+                      notices=NoticeTracker(n, rules, history=history))
                for n in names]
 
     retention = timedelta(days=rules.collection.history_retention_days)
