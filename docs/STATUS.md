@@ -82,12 +82,16 @@ Last updated: 17 Nov 2026
   - Open point for the poll loop: `checks.url_probe.timeout_seconds` (60) equals
     `collection.poll_interval_seconds` (60), so a hanging probe can last a whole poll; the loop must
     not start overlapping polls, or the timeout should be lowered.
-  - Branch `feature/slice7-url-probes` (stacked on slice 6); not committed yet.
+  - Committed (`a5f5fef`) on `feature/slice7-url-probes`.
 
 ### Git
 - Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
-- Slices 5, 6, 7 on `feature/slice5-service-check`, `feature/slice6-weblogic`, `feature/slice7-url-probes`,
-  each stacked on the previous. Slices 5-6 pushed (17 Nov). One branch per slice; commit only after review.
+- Slices 1-7 are a straight line of commits: `feature/build1-core` (1-4) -> `feature/slice5-service-check`
+  -> `feature/slice6-weblogic` -> `feature/slice7-url-probes`, all pushed (17 Nov).
+- Pull request `feature/slice7-url-probes` -> `main` (all seven slices) being opened 17 Nov; merge with
+  a merge commit so every slice commit stays visible.
+- After the merge: each new slice branches off `main` and merges back after review (no more stacking).
+  Commit only after review.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
@@ -102,7 +106,7 @@ Last updated: 17 Nov 2026
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps (resume here)
-1. Review and commit slice 7; push it.
+1. Merge the slices 1-7 pull request into `main`; start slice 8 from the updated `main`.
 2. When masked outputs arrive: add them to `tests/fixtures/winrm/` (and later `weblogic/`) and run the
    parse tests against them; fix an adapter if the real output differs from the synthetic format.
 3. Next: SQL Server collector (pyodbc, DMVs and msdb) on its own branch with a fake and samples; then
