@@ -203,6 +203,24 @@ class TestAgainstRules:
         assert "environments.PROD.nodes.hfm_node3: not used by any enabled component in rules.yaml" in found
         assert any("component epmhfm does not run on hfm_node3" in p for p in found)
 
+    def test_missing_weblogic_server_name(self, env_data, repo_rules):
+        del env_data["environments"]["PROD"]["weblogic"]["servers"]["shared_services"]["web_node_02"]
+        assert problems(env_data, repo_rules) == [
+            "environments.PROD.weblogic.servers.shared_services: no WebLogic server name for node web_node_02"
+        ]
+
+    def test_weblogic_server_for_component_without_that_check(self, env_data, repo_rules):
+        env_data["environments"]["PROD"]["weblogic"]["servers"]["hfm_web"] = {"web_node_01": "HFMWeb0"}
+        assert problems(env_data, repo_rules) == [
+            "environments.PROD.weblogic.servers.hfm_web: component hfm_web has no weblogic_server check "
+            "in rules.yaml"
+        ]
+
+    def test_weblogic_admin_url_must_be_http(self, env_data, repo_rules):
+        env_data["environments"]["PROD"]["weblogic"]["admin_url"] = "wls-admin.example.test:1234"
+        with pytest.raises(EnvironmentConfigError, match="weblogic.admin_url"):
+            parse_environments(yaml.safe_dump(env_data), repo_rules)
+
     def test_service_for_unknown_component(self, env_data, repo_rules):
         env_data["environments"]["PROD"]["services"]["essbase"] = {"web_node_01": "Essbase"}
         assert problems(env_data, repo_rules) == [

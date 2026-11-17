@@ -58,11 +58,24 @@ Last updated: 17 Nov 2026
   - `--username` prompts for the password; refused for PROD (D11). Only the chosen environment's block
     of environments.yaml must be filled in (`only_environment` loader option). Decision D20.
   - Smoke-tested with the real pypsrp adapter against invented hosts: clean Unknown results, no crash.
-  - Branch `feature/slice5-service-check` (from `feature/build1-core`); not committed yet.
+  - Committed (`664d153`) on `feature/slice5-service-check`.
+- Slice 6 (17 Nov): WebLogic collector, 380 tests passing.
+  - Port `ports/weblogic.py`; adapter `adapters/weblogic_rest.py` (httpx; one read-only bulk search on
+    the Admin Server: lifecycle state, health, stuck threads, heap); fake `adapters/fake_weblogic.py`;
+    collector `app/weblogic_collector.py` (server name per node from environments.yaml).
+  - rules.yaml: health map `health_up/degraded/down` (ASSUMED Q22), WARNING moved from lifecycle to
+    health, STARTING / SHUTTING_DOWN Degraded, FAILED_NOT_RESTARTABLE Down, `timeout_seconds` (ASSUMED Q40).
+  - environments template: `weblogic:` block (admin URL placeholder, server names per node); the
+    cross-checks now cover WebLogic server names too.
+  - Secret store port `ports/secrets.py`; interim adapter reads environment variables
+    (`adapters/env_secrets.py`) until Q55 is decided. Queries Q55, Q56 added. Decision D21.
+  - Synthetic REST samples in `tests/fixtures/weblogic/`; not run against a real Admin Server yet (A09).
+  - Branch `feature/slice6-weblogic` (stacked on slice 5); not committed yet.
 
 ### Git
 - Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
-- Slice 5 on `feature/slice5-service-check`. One branch per slice; commit only after review.
+- Slice 5 on `feature/slice5-service-check`, slice 6 on `feature/slice6-weblogic` (stacked on slice 5).
+  One branch per slice; commit only after review. Slices 5-6 not pushed yet.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
@@ -70,15 +83,16 @@ Last updated: 17 Nov 2026
   Then run `hfm-check-services --env NONPROD --record <dir>` there, review the masked files and bring
   them back for `tests/fixtures/winrm/`.
 - Q53 (how Unknown nodes are scored) and Q54 (healthy HTTP codes) waiting for the application team.
+- Q55 (production secret store) open with infrastructure / security; Q56 (non-prod WebLogic names) assumed.
 - Dev environment note: on this workstation Python 3.12 and git are not on PATH in new shells; use
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps (resume here)
-1. Review and commit slice 5.
-2. When masked outputs arrive: add them to `tests/fixtures/winrm/` and parse tests against them; fix
-   the adapter if the real output differs from the synthetic format.
-3. Next collectors, each on its own branch with a fake and samples: WebLogic REST (state, stuck
-   threads, heap), URL probes (httpx), SQL Server DMVs (pyodbc); then the poll loop wiring
+1. Review and commit slice 6; push slices 5-6.
+2. When masked outputs arrive: add them to `tests/fixtures/winrm/` (and later `weblogic/`) and run the
+   parse tests against them; fix an adapter if the real output differs from the synthetic format.
+3. Next collectors, each on its own branch with a fake and samples: URL probes (httpx, per node and
+   through the load balancer), SQL Server DMVs (pyodbc); then the poll loop wiring
    collectors -> node state -> scoring.
 4. Open a pull request for `feature/build1-core` to `main` when convenient.
 5. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;

@@ -33,9 +33,15 @@ checks:
       fr_web: 30
 
   weblogic_server:                       # basis: ASSUMED Q22; stuck-thread time CONFIRMED Q22
+    # Lifecycle state (serverLifeCycleRuntimes). WARNING is a health state, see health_* below.
     up: [RUNNING]
-    degraded: [WARNING, ADMIN, RESUMING, SUSPENDING]
-    down: [FAILED, SHUTDOWN, FORCE_SHUTTING_DOWN, UNKNOWN]
+    degraded: [ADMIN, RESUMING, SUSPENDING, STARTING, SHUTTING_DOWN]
+    down: [FAILED, FAILED_NOT_RESTARTABLE, SHUTDOWN, FORCE_SHUTTING_DOWN, UNKNOWN]
+    # Health state reported by a running server (serverRuntimes.healthState)   # ASSUMED Q22
+    health_up: [ok]
+    health_degraded: [warning, overloaded, critical]
+    health_down: [failed]
+    timeout_seconds: 20                  # ASSUMED Q40 - WebLogic REST request; must stay below poll_interval_seconds
     stuck_thread_max_time_seconds: 3600  # CONFIRMED Q22 - WebLogic reports a thread stuck after this
     degraded_if_stuck_threads_above: 0
     degraded_if_heap_used_pct_above: 90

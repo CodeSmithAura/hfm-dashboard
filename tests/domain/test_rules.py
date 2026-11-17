@@ -146,3 +146,17 @@ class TestWindowsServiceTimeout:
 
     def test_shipped_value(self, repo_rules):
         assert repo_rules.checks.windows_service.timeout_seconds == 20   # ASSUMED Q40
+
+
+class TestWeblogicTimeout:
+    def test_must_be_below_poll_interval(self, rules_dict):
+        rules_dict["checks"]["weblogic_server"]["timeout_seconds"] = 60
+        invalid(rules_dict, "weblogic_server.timeout_seconds must be below")
+
+    def test_required(self, rules_dict):
+        del rules_dict["checks"]["weblogic_server"]["timeout_seconds"]
+        invalid(rules_dict, "timeout_seconds")
+
+    def test_shipped_value(self, repo_rules):
+        assert repo_rules.checks.weblogic_server.timeout_seconds == 20   # ASSUMED Q40
+

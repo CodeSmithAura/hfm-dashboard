@@ -167,16 +167,34 @@ class TestUrlProbe:
 # --------------------------------------------------------------------------- weblogic_server
 
 class TestWeblogic:
-    def ev(self, rules, state="RUNNING", stuck=0, heap=50.0):
-        return evaluate("weblogic_server", WeblogicObservation(state, stuck, heap), rules.checks)
+    def ev(self, rules, state="RUNNING", stuck=0, heap=50.0, health="ok"):
+        return evaluate("weblogic_server", WeblogicObservation(state, stuck, heap, health), rules.checks)
 
     def test_healthy(self, rules):
         assert self.ev(rules).status is U
 
     @pytest.mark.parametrize(("state", "expected"),
-                             [("WARNING", G), ("FAILED", D), ("STARTING", X)])
+                             [("ADMIN", G), ("FAILED", D), ("STARTING", X)])
     def test_state_map(self, rules, state, expected):
         assert self.ev(rules, state=state).status is expected
+
+    @pytest.mark.parametrize(("health", "expected"),
+                             [("ok", U), ("warning", G), ("failed", D), ("odd", X)])
+    def test_health_map(self, rules, health, expected):
+        ev = self.ev(rules, health=health)
+        assert ev.status is expected
+        if expected is not U:
+            assert f"health {health}" in ev.detail or "not listed" in ev.detail
+
+    def test_health_map_read_from_rules(self, rules_dict):
+        rules_dict["checks"]["weblogic_server"]["health_degraded"] = []
+        rules_dict["checks"]["weblogic_server"]["health_down"] = ["failed", "warning"]
+        assert self.ev(Rules.model_validate(rules_dict), health="warning").status is D
+
+    def test_health_state_in_two_lists_rejected(self, rules_dict):
+        rules_dict["checks"]["weblogic_server"]["health_down"].append("ok")
+        with pytest.raises(ValidationError, match="health state 'ok'"):
+            Rules.model_validate(rules_dict)
 
     def test_stuck_threads_above_threshold(self, rules):
         ev = self.ev(rules, stuck=1)
@@ -196,20 +214,33 @@ class TestWeblogic:
         assert "heap" in ev.detail
 
     def test_down_state_ignores_metrics(self, rules):
-        ev = self.ev(rules, state="FAILED", stuck=None, heap=None)
+        ev = self.ev(rules, state="FAILED", stuck=None, heap=None, health=None)
         assert ev.status is D
         assert ev.detail == "server FAILED"
 
     def test_missing_metrics_are_unknown(self, rules):
         assert self.ev(rules, stuck=None).status is X
         assert self.ev(rules, heap=None).status is X
-        assert self.ev(rules, state="WARNING", heap=None).status is G
+        assert self.ev(rules, health=None).status is X
+        assert self.ev(rules, state="ADMIN", heap=None).status is G
+
+    def test_several_problems_all_listed(self, rules):
+        ev = self.ev(rules, stuck=3, heap=95, health="warning")
+        assert ev.status is G
+        assert "stuck" in ev.detail and "heap" in ev.detail and "health warning" in ev.detail
 
     @pytest.mark.parametrize(("state", "expected"), [
-        ("RUNNING", U), ("ADMIN", G), ("SUSPENDING", G), ("SHUTDOWN", D), ("UNKNOWN", D),
+        ("RUNNING", U), ("ADMIN", G), ("SUSPENDING", G), ("STARTING", G), ("SHUTTING_DOWN", G),
+        ("SHUTDOWN", D), ("UNKNOWN", D), ("FAILED_NOT_RESTARTABLE", D), ("WARNING", X),
     ])
     def test_shipped_states(self, repo_rules, state, expected):
         assert self.ev(repo_rules, state=state).status is expected
+
+    @pytest.mark.parametrize(("health", "expected"), [
+        ("ok", U), ("warning", G), ("overloaded", G), ("critical", G), ("failed", D),
+    ])
+    def test_shipped_health(self, repo_rules, health, expected):
+        assert self.ev(repo_rules, health=health).status is expected
 
 
 # --------------------------------------------------------------------------- sql_server

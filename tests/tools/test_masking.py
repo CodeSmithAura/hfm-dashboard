@@ -15,6 +15,7 @@ def env_with(hosts: dict[str, str]) -> Environment:
         "nodes": {k: {"host": h, "role": "web"} for k, h in hosts.items()},
         "ports": {},
         "winrm": {"port": 1234, "use_ssl": False, "auth": "negotiate"},
+        "weblogic": {"admin_url": "https://wlsadm.client-corp.invalid:1234", "servers": {}},
         "services": {},
         "databases": [],
         "notices": {"smtp_relay": "relay.client-corp.invalid", "from_address": "a@client-corp.invalid"},
@@ -53,9 +54,13 @@ class TestMask:
         text = '[{"wanted":"HyS9FRReports_EPMWEB1","status":"Running"}]'
         assert mask(text, pairs) == text
 
+    def test_url_hosts_masked(self, pairs):
+        assert mask("lb.client-corp.invalid wlsadm.client-corp.invalid wlsadm", pairs) == \
+            "lb.example.test wls-admin.example.test wls-admin"
+
     def test_already_invented_values_not_masked(self):
         pairs = build_masks(env_with({"web_node_01": "web-node-01.example.test"}))
-        assert pairs == []
+        assert not any("example.test" in real or real == "web-node-01" for real, _ in pairs)
         assert leftovers("web-node-01.example.test", pairs) == []
 
     def test_ip_as_host(self):

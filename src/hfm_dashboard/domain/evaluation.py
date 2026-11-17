@@ -49,11 +49,17 @@ class UrlProbeObservation:
 
 @dataclass(frozen=True, slots=True)
 class WeblogicObservation:
-    """Server runtime from the WebLogic REST API."""
+    """Server runtime from the WebLogic REST API.
+
+    ``state`` is the lifecycle state (RUNNING, SHUTDOWN, ...); ``health`` the health state of a
+    running server (ok, warning, ...). Metrics are None when the server is not running or the
+    value could not be read.
+    """
 
     state: str
     stuck_threads: int | None = None
     heap_used_pct: float | None = None
+    health: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,6 +175,11 @@ def _weblogic(obs: WeblogicObservation, checks: Checks) -> Evaluation:
         return state  # runtime metrics of a dead server are meaningless
 
     findings = [(state.status, state.detail)]
+    if obs.health is None:
+        findings.append((Status.UNKNOWN, "health not read"))
+    else:
+        health = _state(rule.health_map(), obs.health, "health")
+        findings.append((health.status, health.detail))
     if obs.stuck_threads is None:
         findings.append((Status.UNKNOWN, "stuck threads not read"))
     elif obs.stuck_threads > rule.degraded_if_stuck_threads_above:

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
+from urllib.parse import urlsplit
 
 from hfm_dashboard.domain.environment import Environment
 
@@ -29,6 +30,14 @@ def build_masks(env: Environment, extra: Iterable[tuple[str, str]] = ()) -> list
             short, suffix = host.split(".", 1)
             pairs.setdefault(short.lower(), fake_short)
             pairs.setdefault(suffix.lower(), FAKE_DOMAIN)
+    for url, fake_short in ((env.load_balancer.url, "lb"), (env.weblogic.admin_url, "wls-admin")):
+        host = (urlsplit(url).hostname or "").strip()
+        if host:
+            pairs.setdefault(host.lower(), f"{fake_short}.{FAKE_DOMAIN}")
+            if "." in host and not IPV4.fullmatch(host):
+                short, suffix = host.split(".", 1)
+                pairs.setdefault(short.lower(), fake_short)
+                pairs.setdefault(suffix.lower(), FAKE_DOMAIN)
     for real, replacement in extra:
         if real:
             pairs.setdefault(real.lower(), replacement)

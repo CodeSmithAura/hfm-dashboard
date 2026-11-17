@@ -55,6 +55,21 @@ class WinRM(_Strict):
     cert_validation: bool = True
 
 
+class Weblogic(_Strict):
+    """WebLogic REST management API on the Admin Server, and which server runs where."""
+
+    admin_url: NonEmpty
+    cert_validation: bool = True
+    servers: dict[str, dict[str, NonEmpty]]    # component -> node -> WebLogic server name
+
+    @field_validator("admin_url")
+    @classmethod
+    def _http_url(cls, url: str) -> str:
+        if not url.startswith(("https://", "http://")):
+            raise ValueError("admin_url must start with https:// or http://")
+        return url.rstrip("/")
+
+
 class EnvironmentNotices(_Strict):
     smtp_relay: NonEmpty
     from_address: NonEmpty
@@ -68,6 +83,7 @@ class Environment(_Strict):
     nodes: dict[str, Node] = Field(min_length=1)
     ports: dict[str, Port]
     winrm: WinRM
+    weblogic: Weblogic
     services: dict[str, dict[str, NonEmpty]]   # component -> node -> Windows service name
     databases: list[NonEmpty]
     notices: EnvironmentNotices
@@ -80,6 +96,22 @@ class Environment(_Strict):
     def service_name(self, component_id: str, node: str) -> str:
         """Windows service name, looked up per node (never derived: suffixes differ per node)."""
         return self.services[component_id][node]
+
+    def weblogic_server(self, component_id: str, node: str) -> str:
+        """WebLogic server name of a component on a node (e.g. a managed server per web node)."""
+        return self.weblogic.servers[component_id][node]
+
+    def names_for(self, check_kind: str) -> tuple[str, dict[str, dict[str, str]]]:
+        """(config path, component -> node -> name) for checks that need a name per node."""
+        if check_kind == "windows_service":
+            return "services", self.services
+        if check_kind == "weblogic_server":
+            return "weblogic.servers", self.weblogic.servers
+        raise KeyError(check_kind)
+
+
+# Checks whose target on each node is named in environments.yaml
+NAMED_CHECKS = ("windows_service", "weblogic_server")
 
 
 class Monitoring(_Strict):
@@ -115,24 +147,35 @@ def check_against_rules(config: EnvironmentsConfig, rules: Rules) -> list[str]:
                 problems.append(f"{where}: component {cid} has none of its nodes {comp.nodes} "
                                 f"in this environment")
                 continue
-            if "windows_service" in comp.checks:
-                names = env.services.get(cid, {})
+            for kind in NAMED_CHECKS:
+                if kind not in comp.checks:
+                    continue
+                path, table = env.names_for(kind)
+                names = table.get(cid, {})
                 for node in present:
                     if node not in names:
-                        problems.append(f"{where}.services.{cid}: no service name for node {node}")
+                        problems.append(f"{where}.{path}.{cid}: no {_LABEL[kind]} for node {node}")
 
         for node in env.nodes:
             if node not in used_nodes:
                 problems.append(f"{where}.nodes.{node}: not used by any enabled component in rules.yaml")
 
-        for cid, names in env.services.items():
-            if cid not in rules.components:
-                problems.append(f"{where}.services.{cid}: no such component in rules.yaml")
-                continue
-            for node in names:
-                if node not in env.nodes:
-                    problems.append(f"{where}.services.{cid}.{node}: node not declared in this environment")
-                elif node not in rules.components[cid].nodes:
-                    problems.append(f"{where}.services.{cid}.{node}: component {cid} does not run on "
-                                    f"{node} in rules.yaml")
+        for kind in NAMED_CHECKS:
+            path, table = env.names_for(kind)
+            for cid, names in table.items():
+                if cid not in rules.components:
+                    problems.append(f"{where}.{path}.{cid}: no such component in rules.yaml")
+                    continue
+                if kind not in rules.components[cid].checks:
+                    problems.append(f"{where}.{path}.{cid}: component {cid} has no {kind} check in "
+                                    f"rules.yaml")
+                for node in names:
+                    if node not in env.nodes:
+                        problems.append(f"{where}.{path}.{cid}.{node}: node not declared in this environment")
+                    elif node not in rules.components[cid].nodes:
+                        problems.append(f"{where}.{path}.{cid}.{node}: component {cid} does not run on "
+                                        f"{node} in rules.yaml")
     return problems
+
+
+_LABEL = {"windows_service": "service name", "weblogic_server": "WebLogic server name"}

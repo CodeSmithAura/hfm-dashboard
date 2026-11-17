@@ -11,10 +11,11 @@ dependencies = [
     "pydantic>=2.7",
     "PyYAML>=6",
     "pypsrp>=0.8",          # WinRM / PowerShell remoting (Windows services collector)
+    "httpx>=0.27",          # WebLogic REST (and later URL probes)
 ]
 
 [project.optional-dependencies]
-# Added slice by slice as adapters arrive: fastapi, apscheduler, httpx, pyodbc, playwright
+# Added slice by slice as adapters arrive: fastapi, apscheduler, pyodbc, playwright
 dev = ["pytest>=8"]
 
 [project.scripts]

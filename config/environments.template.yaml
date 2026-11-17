@@ -50,6 +50,15 @@ environments:
       use_ssl: false                 # HTTP listener; Negotiate/Kerberos still encrypts the payload. true for an HTTPS listener
       auth: negotiate                # negotiate or kerberos; the service's gMSA identity is used, no password stored
 
+    weblogic:                        # WebLogic REST management API on the Admin Server (A09: read-only Monitor user)
+      admin_url: "{{WLS_ADMIN_URL}}" # scheme://host:port of the Admin Server on web node 1
+      servers:                       # WebLogic server name per node (discovered: FoundationServices0/1)
+        shared_services:
+          web_node_01: "FoundationServices0"
+          web_node_02: "FoundationServices1"
+        admin_server:
+          web_node_01: "AdminServer"
+
     services:                        # Windows service name on each node (Q15) - all discovered 3 Nov
       ohs_load_balancer:
         web_node_01: "OHS"
@@ -127,6 +136,12 @@ environments:
       port: "{{NP_WINRM_PORT}}"
       use_ssl: false
       auth: negotiate
+
+    weblogic:
+      admin_url: "{{NP_WLS_ADMIN_URL}}"
+      servers:                       # confirm the non-prod server names with discovery (Q56)
+        shared_services: { web_node_01: "FoundationServices0" }
+        admin_server:    { web_node_01: "AdminServer" }
 
     services:                        # all discovered on the development hosts
       ohs_load_balancer: { web_node_01: "OHS" }

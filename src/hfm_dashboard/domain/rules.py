@@ -63,9 +63,30 @@ class UrlProbeCheck(_Strict):
 
 
 class WeblogicServerCheck(StateMapCheck):
+    """Lifecycle state map (up/degraded/down) plus a separate health-state map."""
+
+    health_up: list[str]
+    health_degraded: list[str]
+    health_down: list[str]
+    timeout_seconds: int = Field(gt=0)   # WebLogic REST request timeout
+    # Informational: WebLogic itself decides when a thread is stuck (server setting, checked by
+    # discovery); the collector reads WebLogic's stuck-thread count.
     stuck_thread_max_time_seconds: int = Field(gt=0)
     degraded_if_stuck_threads_above: int = Field(ge=0)
     degraded_if_heap_used_pct_above: Pct
+
+    @model_validator(mode="after")
+    def _health_disjoint(self) -> WeblogicServerCheck:
+        seen: dict[str, str] = {}
+        for bucket in ("health_up", "health_degraded", "health_down"):
+            for state in getattr(self, bucket):
+                if state in seen:
+                    raise ValueError(f"health state {state!r} listed under both {seen[state]} and {bucket}")
+                seen[state] = bucket
+        return self
+
+    def health_map(self) -> StateMapCheck:
+        return StateMapCheck(up=self.health_up, degraded=self.health_degraded, down=self.health_down)
 
 
 class SqlServerCheck(_Strict):
@@ -229,9 +250,10 @@ class Rules(_Strict):
     def _cross_references(self) -> Rules:
         if not any(c.enabled for c in self.components.values()):
             raise ValueError("no enabled components")
-        if self.checks.windows_service.timeout_seconds >= self.collection.poll_interval_seconds:
-            raise ValueError("checks.windows_service.timeout_seconds must be below "
-                             "collection.poll_interval_seconds")
+        for kind in ("windows_service", "weblogic_server"):
+            if getattr(self.checks, kind).timeout_seconds >= self.collection.poll_interval_seconds:
+                raise ValueError(f"checks.{kind}.timeout_seconds must be below "
+                                 "collection.poll_interval_seconds")
         probes = self.checks.url_probe.degraded_after_seconds
         for cid, comp in self.components.items():
             if comp.criticality not in self.criticality_weights:

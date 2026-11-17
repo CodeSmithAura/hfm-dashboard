@@ -59,8 +59,12 @@ _BASE: dict[str, Any] = {
         },
         "weblogic_server": {
             "up": ["RUNNING"],
-            "degraded": ["WARNING"],
+            "degraded": ["ADMIN"],
             "down": ["FAILED"],
+            "health_up": ["ok"],
+            "health_degraded": ["warning"],
+            "health_down": ["failed"],
+            "timeout_seconds": 20,
             "stuck_thread_max_time_seconds": 3600,
             "degraded_if_stuck_threads_above": 0,
             "degraded_if_heap_used_pct_above": 90,
