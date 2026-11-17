@@ -18,6 +18,7 @@ from hfm_dashboard.domain.rules import Rules
 from hfm_dashboard.domain.snapshot import NodeKey
 from hfm_dashboard.domain.status import NodeState, Status
 from hfm_dashboard.ports.history import HistoryRepository
+from hfm_dashboard.ports.mail import DeliveryError
 from hfm_dashboard.ports.maintenance import MaintenanceCalendar, NoMaintenance
 
 log = logging.getLogger(__name__)
@@ -90,5 +91,6 @@ class NoticeTracker:
             self._deliver(notices)
             return True, ""
         except Exception as exc:  # noqa: BLE001 - a delivery failure must not stop polling
-            log.error("%s: notice delivery failed (%s)", self.environment, type(exc).__name__)
-            return False, f"delivery failed ({type(exc).__name__})"
+            reason = str(exc) if isinstance(exc, DeliveryError) else type(exc).__name__
+            log.error("%s: notice delivery failed (%s)", self.environment, reason)
+            return False, f"delivery failed ({reason})"

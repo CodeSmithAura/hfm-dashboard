@@ -20,7 +20,7 @@ def env_with(hosts: dict[str, str]) -> Environment:
         "sql": {"port": "sql", "auth": "windows"},
         "services": {},
         "databases": [],
-        "notices": {"smtp_relay": "relay.client-corp.invalid", "from_address": "a@client-corp.invalid"},
+        "notices": {"smtp_relay": "relay.client-corp.invalid", "smtp_port": 1234, "from_address": "a@client-corp.invalid"},
         "secrets": {},
     })
 

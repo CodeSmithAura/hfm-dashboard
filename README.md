@@ -7,6 +7,7 @@ Live availability, stability score and caution notices for the Oracle HFM enviro
 - Requirements, environment, decisions: `docs/`
 - Behaviour configuration: `config/rules.yaml`
 - Environment template (copy to `config/environments.yaml` on the server only): `config/environments.template.yaml`
+- Owner list template (copy to `config/owners.yaml` on the server only): `config/owners.template.yaml`
 - Read-only discovery and pre-flight scripts: `tools/discovery/`
 - Query log and live delivery plan: `docs/query_log.csv`, `docs/delivery_plan.xlsx`
 
@@ -50,8 +51,14 @@ History (poll scores, node states, status changes) is kept in `<data-dir>/histor
 (default `data/`), restored after a restart and purged after `history_retention_days`.
 Use `--data-dir <folder>` to place it, or `--no-history` for a dry run that writes nothing.
 
-Caution notices are worked out every poll (rules.yaml `notices:`) and printed as `NOTICE` lines; email delivery
-arrives with slice 13. Notices of environments with `notices_enabled: false` are only logged.
+Caution notices are worked out every poll (rules.yaml `notices:`), printed as `NOTICE` lines and emailed
+through the SMTP relay in `environments.yaml`. Recipients come from `config/owners.yaml` (copy
+`config/owners.template.yaml`, git-ignored). Without that file notices are logged as "owner list missing".
+Notices of environments with `notices_enabled: false` are only logged. Check delivery before go-live:
+
+```
+.venv\Scripts\hfm-dashboard --config-dir config --test-email PROD     # one test email to the monitoring team
+```
 
 When updating the code on the server, update `config/rules.yaml` too: new keys are required and the
 program refuses to start on an outdated file.

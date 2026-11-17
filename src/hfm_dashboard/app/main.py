@@ -23,25 +23,49 @@ from typing import TextIO
 from datetime import UTC, datetime, timedelta
 
 from hfm_dashboard.adapters.env_secrets import EnvironmentSecretStore
+from hfm_dashboard.adapters.smtp_mail import SmtpMailSender
 from hfm_dashboard.adapters.sqlite_history import SqliteHistory
+from hfm_dashboard.app.notice_mailer import NoticeMailer
 from hfm_dashboard.app.notice_tracker import NoticeTracker
 from hfm_dashboard.app.poller import Collectors, Poller, PollSnapshot
 from hfm_dashboard.app.scheduler import build_scheduler
 from hfm_dashboard.app.wiring import build_collectors
+from hfm_dashboard.config.owners_loader import OwnersError, load_owners
 from hfm_dashboard.config.startup import ConfigurationError, load_configuration
 from hfm_dashboard.domain.environment import Environment
 from hfm_dashboard.domain.rules import Rules
+from hfm_dashboard.domain.notice_text import OutgoingMail
+from hfm_dashboard.domain.owners import OwnersConfig
 from hfm_dashboard.domain.status import Status
 from hfm_dashboard.ports.history import HistoryError, HistoryRepository
+from hfm_dashboard.ports.mail import DeliveryError, MailSender
 
 log = logging.getLogger("hfm_dashboard")
 
 CollectorsFactory = Callable[[str, Environment, Rules], Collectors]
+SenderFactory = Callable[[Environment, Rules], MailSender]
 HISTORY_FILE = "history.sqlite"
 
 
 def _default_factory(name: str, env: Environment, rules: Rules) -> Collectors:
     return build_collectors(env, rules, EnvironmentSecretStore())
+
+
+def _default_sender(env: Environment, rules: Rules) -> MailSender:
+    n = env.notices
+    return SmtpMailSender(n.smtp_relay, n.smtp_port, n.from_address, rules.notices.smtp_timeout_seconds,
+                          starttls=n.starttls)
+
+
+def delivery_check_mail(env_name: str, env: Environment, owners: OwnersConfig) -> OutgoingMail:
+    """A delivery check sent to the monitoring team (``--test-email``)."""
+    return OutgoingMail(
+        to=tuple(owners.monitoring_team), cc=(),
+        subject=f"[HFM {env_name}] TEST: notice delivery check",
+        body=(f"HFM availability notice - {env.display_name}\n\n"
+              "This is a test message from the HFM availability monitor. If you received it, notice\n"
+              "emails can reach this address through the SMTP relay. No action is needed.\n"),
+    )
 
 
 def summarise(s: PollSnapshot) -> list[str]:
@@ -76,6 +100,7 @@ def main(
     out: TextIO | None = None,
     stop: threading.Event | None = None,
     history: HistoryRepository | None = None,
+    sender_factory: SenderFactory = _default_sender,
 ) -> int:
     out = out or sys.stdout
     p = argparse.ArgumentParser(prog="hfm-dashboard")
@@ -84,6 +109,7 @@ def main(
     p.add_argument("--env", action="append", help="only this environment (repeatable)")
     p.add_argument("--data-dir", type=Path, default=Path("data"), help="folder for history.sqlite")
     p.add_argument("--no-history", action="store_true", help="do not read or write the history store")
+    p.add_argument("--test-email", metavar="ENV", help="send one test email to the monitoring team, exit")
     args = p.parse_args(argv)
 
     try:
@@ -93,6 +119,26 @@ def main(
         return 2
 
     rules = config.rules
+    try:
+        owners = load_owners(args.config_dir, rules)
+    except OwnersError as exc:
+        print(f"refusing to start: {exc}", file=sys.stderr)
+        return 2
+    if owners is None:
+        log.warning("%s not found: notices are worked out and logged but not emailed", rules.notices.owners_file)
+
+    if args.test_email:
+        env = config.environments.environments.get(args.test_email)
+        if env is None or owners is None:
+            print("--test-email needs a known environment and an owners file", file=sys.stderr)
+            return 2
+        try:
+            sender_factory(env, rules).send(delivery_check_mail(args.test_email, env, owners))
+        except DeliveryError as exc:
+            print(f"test email NOT sent: {exc}", file=out)
+            return 1
+        print(f"test email sent to {len(owners.monitoring_team)} monitoring address(es)", file=out)
+        return 0
     names = args.env or list(config.environments.environments)
     unknown = [n for n in names if n not in config.environments.environments]
     if unknown:
@@ -109,7 +155,9 @@ def main(
 
     pollers = [Poller(n, config.environments.environments[n], rules,
                       collectors_factory(n, config.environments.environments[n], rules), history=history,
-                      notices=NoticeTracker(n, rules, history=history))
+                      notices=NoticeTracker(n, rules, history=history, deliver=NoticeMailer(
+                          config.environments.environments[n], rules, owners,
+                          sender_factory(config.environments.environments[n], rules))))
                for n in names]
 
     retention = timedelta(days=rules.collection.history_retention_days)

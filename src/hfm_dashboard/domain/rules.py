@@ -210,8 +210,10 @@ class Notices(_Strict):
     require_acknowledgement: Literal[False]   # acknowledgement needs the dashboard (not built yet)
     group_downstream_under_root_cause: bool
     include_restart_guidance: bool
+    restart_order: list[str]             # component ids in start order (restart guidance)
     auto_restart: Literal[False]  # hard rule 3: read-only against HFM
     owners_file: str
+    smtp_timeout_seconds: float = Field(gt=0)
 
 
 class CloseCalendar(_Strict):
@@ -297,6 +299,12 @@ class Rules(_Strict):
             if "event_log" in comp.checks and "windows_service" not in comp.checks:
                 raise ValueError(f"component {cid}: event_log needs a windows_service check "
                                  "(crash events are matched by service name)")
+        order = self.notices.restart_order
+        for cid in order:
+            if cid not in self.components:
+                raise ValueError(f"notices.restart_order: unknown component {cid!r}")
+        if len(set(order)) != len(order):
+            raise ValueError("notices.restart_order: a component is listed twice")
         return self
 
     def enabled_components(self) -> dict[str, Component]:

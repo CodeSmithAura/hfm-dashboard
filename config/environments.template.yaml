@@ -107,8 +107,10 @@ environments:
 
     notices:
       smtp_relay: "{{SMTP_RELAY}}"
+      smtp_port: "{{SMTP_PORT}}"
+      starttls: true                 # relay set-up to be confirmed with A13
       from_address: "{{NOTICE_FROM_ADDRESS}}"
-      # owner and escalation addresses per component come from the owner list (Q32)
+      # owner and escalation addresses per component come from owners.yaml (Q32)
 
     # Secret names only - values live in the environment's secret store
     secrets:
@@ -184,6 +186,8 @@ environments:
 
     notices:
       smtp_relay: "{{SMTP_RELAY}}"
+      smtp_port: "{{SMTP_PORT}}"
+      starttls: true
       from_address: "{{NOTICE_FROM_ADDRESS}}"
 
     secrets:
