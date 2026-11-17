@@ -89,9 +89,28 @@ class SqlServerObservation:
     longest_query_minutes: float | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class DiskObservation:
+    """Free space per local volume of a node (volume label -> % free)."""
+
+    volumes: dict[str, float]
+
+
+@dataclass(frozen=True, slots=True)
+class EventLogObservation:
+    """System event log counts over ``checks.event_log.lookback_minutes`` on one node.
+
+    ``service_crashes``: crash events of this component's service; ``unexpected_shutdowns``: unexpected
+    shutdown / reboot events of the whole server.
+    """
+
+    service_crashes: int
+    unexpected_shutdowns: int
+
+
 Observation = Union[
     CollectionFailure, ServiceObservation, UrlProbeObservation, WeblogicObservation,
-    SqlServerObservation,
+    SqlServerObservation, DiskObservation, EventLogObservation,
 ]
 
 
@@ -121,6 +140,10 @@ def evaluate(check_ref: str, observation: Observation, checks: Checks) -> Evalua
         return _url_probe(arg, observation, checks)
     if kind == "weblogic_server":
         return _weblogic(observation, checks)
+    if kind == "disk":
+        return _disk(observation, checks)
+    if kind == "event_log":
+        return _event_log(observation, checks)
     return _sql_server(observation, checks)
 
 
@@ -129,6 +152,8 @@ _OBSERVATION_FOR: dict[str, type] = {
     "url_probe": UrlProbeObservation,
     "weblogic_server": WeblogicObservation,
     "sql_server": SqlServerObservation,
+    "disk": DiskObservation,
+    "event_log": EventLogObservation,
 }
 
 
@@ -260,3 +285,32 @@ def _sql_server(obs: SqlServerObservation, checks: Checks) -> Evaluation:
     if not findings:
         findings.append((Status.UP, "all SQL Server checks within thresholds"))
     return _combine(findings)
+
+
+def _disk(obs: DiskObservation, checks: Checks) -> Evaluation:
+    rule = checks.disk
+    if not obs.volumes:
+        return Evaluation(Status.UNKNOWN, "no local volumes reported")
+    findings: list[tuple[Status, str]] = []
+    for volume, free in sorted(obs.volumes.items()):
+        if free < rule.down_if_free_pct_below:
+            findings.append((Status.DOWN, f"{volume} {free:g}% free < {rule.down_if_free_pct_below:g}%"))
+        elif free < rule.degraded_if_free_pct_below:
+            findings.append((Status.DEGRADED, f"{volume} {free:g}% free < {rule.degraded_if_free_pct_below:g}%"))
+    if not findings:
+        lowest = min(obs.volumes, key=obs.volumes.__getitem__)
+        findings.append((Status.UP, f"lowest {lowest} {obs.volumes[lowest]:g}% free"))
+    return _combine(findings)
+
+
+def _event_log(obs: EventLogObservation, checks: Checks) -> Evaluation:
+    window = checks.event_log.lookback_minutes
+    findings: list[tuple[Status, str]] = []
+    if obs.service_crashes:
+        findings.append((Status.DEGRADED, f"{obs.service_crashes} service crash event(s) in last {window} min"))
+    if obs.unexpected_shutdowns:
+        findings.append((Status.DEGRADED, f"unexpected server shutdown/restart in last {window} min"))
+    if not findings:
+        findings.append((Status.UP, f"no crash events in last {window} min"))
+    return _combine(findings)
+

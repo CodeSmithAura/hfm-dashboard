@@ -59,6 +59,15 @@ checks:
     degraded_if_agent_job_failed_in_last_hours: 24
     degraded_if_query_running_longer_than_minutes: 60   # consolidations can be long; tune after shadow mode
 
+  disk:                                  # basis: ASSUMED Q60 - every local volume of the node (WinRM)
+    degraded_if_free_pct_below: 10       # same levels as the SQL Server data volumes
+    down_if_free_pct_below: 3
+
+  event_log:                             # basis: ASSUMED Q60 - System event log over WinRM (Event Log Readers, A07)
+    lookback_minutes: 60                 # a crash or unexpected restart keeps the node Degraded this long
+    service_crash_event_ids: [7031, 7034, 7023, 7024]   # this component's service terminated unexpectedly / with an error
+    unexpected_shutdown_event_ids: [6008, 41]           # unexpected shutdown / reboot of the whole server
+
   # Flap protection: a node is only marked Down after this many consecutive failed polls
   confirm_down_after_consecutive_failures: 2   # basis: ASSUMED Q40
 
@@ -77,7 +86,7 @@ components:
   sql_server:
     display_name: "SQL Server"
     nodes: [db_node_01]
-    checks: [windows_service, sql_server]
+    checks: [windows_service, sql_server, disk, event_log]
     criticality: critical                # ASSUMED Q26
     hard_dependency: true                # ASSUMED Q28
     single_point_of_failure: true        # Q12 CONFIRMED by discovery: production and non-prod are standalone (no Always On, no failover cluster)
@@ -85,7 +94,7 @@ components:
   sql_agent:
     display_name: "SQL Server Agent"
     nodes: [db_node_01]
-    checks: [windows_service]
+    checks: [windows_service, disk, event_log]
     criticality: medium                  # ASSUMED Q26 - runs backups and jobs; no direct user impact
                                          # Production Agent is set to Manual start (Auto in non-prod): flagged to the DBA
     hard_dependency: false
@@ -101,14 +110,14 @@ components:
   shared_services:
     display_name: "Foundation / Shared Services (Workspace)"
     nodes: [web_node_01, web_node_02]
-    checks: [windows_service, weblogic_server, url_probe:workspace_login]   # service VERIFIED (discovery)
+    checks: [windows_service, weblogic_server, url_probe:workspace_login, disk, event_log]   # service VERIFIED (discovery)
     criticality: critical                # ASSUMED Q26
     hard_dependency: true                # ASSUMED Q28 - nobody can log in without it
 
   ohs_load_balancer:
     display_name: "Oracle HTTP Server / Load balancer"
     nodes: [web_node_01, web_node_02]
-    checks: [windows_service]
+    checks: [windows_service, disk, event_log]
     lb_probe: true                       # CONFIRMED Q05 - also probe through the LB URL
     criticality: critical                # ASSUMED Q26
     hard_dependency: true                # ASSUMED Q28 - applies only when ALL nodes are down
@@ -116,14 +125,14 @@ components:
   epmhfm:
     display_name: "HFM Server (cluster)"
     nodes: [hfm_node_01, hfm_node_02, hfm_node_03]   # CONFIRMED Q09 - one cluster, all apps on every node
-    checks: [windows_service]            # service HyS9FinancialManagementJavaServer_EPMHFM VERIFIED (non-prod)
+    checks: [windows_service, disk, event_log]            # service HyS9FinancialManagementJavaServer_EPMHFM VERIFIED (non-prod)
     criticality: critical                # ASSUMED Q26
     hard_dependency: false
 
   hfm_web:
     display_name: "HFM Web"
     nodes: [web_node_01, web_node_02]    # CONFIRMED Q06 - active-active
-    checks: [windows_service, url_probe:hfm_web]   # service VERIFIED (discovery)
+    checks: [windows_service, url_probe:hfm_web, disk, event_log]   # service VERIFIED (discovery)
     # Note: production OHS routes /oracle-epm-fm-webservices to web node 2 only (Q50), so HFM web
     # services depend on that one node even though /hfmadf is balanced across both.
     criticality: high                    # ASSUMED Q26
@@ -131,7 +140,7 @@ components:
   fr_web:
     display_name: "Financial Reporting Web"
     nodes: [web_node_01, web_node_02]
-    checks: [windows_service, url_probe:fr_web]    # service VERIFIED (discovery)
+    checks: [windows_service, url_probe:fr_web, disk, event_log]    # service VERIFIED (discovery)
     criticality: medium                  # ASSUMED Q26
 
   fr_rmi:
@@ -145,13 +154,13 @@ components:
   admin_server:
     display_name: "WebLogic Admin Server"
     nodes: [web_node_01]                 # CONFIRMED Q04, VERIFIED on production web node 1
-    checks: [windows_service, weblogic_server]
+    checks: [windows_service, weblogic_server, disk, event_log]
     criticality: low                     # ASSUMED Q26 - control plane, no direct user impact
 
   ohs_node_manager:
     display_name: "WebLogic Node Manager (OHS domain)"   # discovery: only the OHS domain has a Node Manager service
     nodes: [web_node_01, web_node_02]
-    checks: [windows_service]
+    checks: [windows_service, disk, event_log]
     criticality: low                     # CONFIRMED Q08 - manual mode, used for scripted startup
 
   # lcm: removed - no scheduled LCM jobs (CONFIRMED Q25)

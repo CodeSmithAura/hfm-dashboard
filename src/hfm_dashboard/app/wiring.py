@@ -11,6 +11,7 @@ from hfm_dashboard.adapters.http_probe import HttpxUrlProber
 from hfm_dashboard.adapters.sql_health import OdbcSqlHealthSource
 from hfm_dashboard.adapters.unavailable import UnavailableSqlSource, UnavailableWeblogicSource
 from hfm_dashboard.adapters.weblogic_rest import WeblogicRestSource
+from hfm_dashboard.adapters.winrm_host_health import WinRMHostHealthSource
 from hfm_dashboard.adapters.winrm_services import WinRMServiceSource
 from hfm_dashboard.app.poller import Collectors
 from hfm_dashboard.domain.environment import Environment
@@ -59,4 +60,5 @@ def build_collectors(env: Environment, rules: Rules, store: SecretStore) -> Coll
         weblogic=weblogic,
         prober=HttpxUrlProber(checks.url_probe.timeout_seconds, cert_validation=env.url_probes.cert_validation),
         sql=sql,
+        host=WinRMHostHealthSource(env.winrm, checks.windows_service.timeout_seconds),
     )
