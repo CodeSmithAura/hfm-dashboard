@@ -115,11 +115,11 @@ Last updated: 17 Nov 2026
     counters survive restarts, no spurious transitions. Purge every 6 h after `history_retention_days`.
   - `hfm-dashboard --data-dir <folder>` (default `data/`) and `--no-history`. Decision D25.
   - Smoke-tested: two real runs, states restored, rows written.
-  - Open design point: a URL probe that cannot connect counts as Down (D17), while WinRM / WebLogic /
-    SQL connection failures count as Unknown. If the monitoring server loses its network path to a web
-    node, web components show Down (and later trigger notices). Decide whether "connection failed"
-    (as opposed to refused / HTTP 5xx / timeout) should be Unknown.
-  - Branch `feature/slice10-history` (stacked on slice 9 until it is merged); not committed yet.
+  - Decided 17 Nov (D26): URL probe failures that only show the host is unreachable from the
+    monitoring server (DNS, no route, connect timeout, TLS / proxy) are Unknown; refused connections,
+    read timeouts and 5xx stay Down. Consequence: a powered-off or isolated server shows Unknown on
+    every check and drops out of the score, so slice 12 must warn when a node stays Unknown.
+  - Committed (`1025bdc`) on `feature/slice10-history`, pushed. D26 change on top, not committed yet.
 
 ### Git
 - Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
@@ -148,7 +148,7 @@ Last updated: 17 Nov 2026
 2. When masked outputs arrive: add them to `tests/fixtures/winrm/` (and later `weblogic/`) and run the
    parse tests against them; fix an adapter if the real output differs from the synthetic format.
 3. Remaining slices, in order: 11 disk space and event log checks (WinRM); 12 notice engine (pure state
-   machine, close calendar, maintenance, root-cause grouping); 13 email (SMTP) and owners.yaml;
+   machine, close calendar, maintenance, root-cause grouping, warning for nodes Unknown too long); 13 email (SMTP) and owners.yaml;
    14 dashboard (FastAPI); 15 HTTPS and AD login; 16 login probe (Playwright); 17 Windows service.
 4. Open a pull request for `feature/build1-core` to `main` when convenient.
 5. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;

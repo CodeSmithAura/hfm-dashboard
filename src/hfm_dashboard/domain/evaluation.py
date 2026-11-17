@@ -39,12 +39,18 @@ class ServiceObservation:
 
 @dataclass(frozen=True, slots=True)
 class UrlProbeObservation:
-    """One HTTP request. ``http_status`` is None when no response arrived."""
+    """One HTTP request. ``http_status`` is None when no response arrived.
+
+    ``unreachable`` marks a failure that says nothing about the application: the host could not be
+    reached from the monitoring server at all (DNS, routing, connect timeout, TLS or proxy set-up).
+    It evaluates to Unknown. A refused connection or a read timeout is not unreachable (D26).
+    """
 
     http_status: int | None
     elapsed_seconds: float | None
     timed_out: bool = False
     error: str = ""          # e.g. "connection refused"; never a URL with credentials
+    unreachable: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +153,8 @@ def _state(rule: StateMapCheck, state: str, label: str) -> Evaluation:
 
 def _url_probe(probe: str, obs: UrlProbeObservation, checks: Checks) -> Evaluation:
     rule = checks.url_probe
+    if obs.unreachable:
+        return Evaluation(Status.UNKNOWN, f"not reachable from the monitoring server: {obs.error or 'no route'}")
     if obs.timed_out or (obs.elapsed_seconds is not None and obs.elapsed_seconds >= rule.timeout_seconds):
         return Evaluation(Status.DOWN, f"no response within {rule.timeout_seconds:g} s")
     if obs.http_status is None:

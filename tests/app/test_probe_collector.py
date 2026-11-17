@@ -92,7 +92,7 @@ class TestCollect:
         assert all(r.node != LB_NODE for r in res.nodes)
 
     def test_details_never_contain_hosts(self, envs, repo_rules):
-        prober = FakeUrlProber(default=UrlProbeObservation(None, 0.1, error="connection failed"))
+        prober = FakeUrlProber(default=UrlProbeObservation(None, 0.1, error="connection refused"))
         res = collect_url_probes(envs["PROD"], repo_rules, prober, T0)
         assert all("example.test" not in r.detail for r in res.nodes + res.load_balancer)
 
@@ -101,13 +101,17 @@ class TestCollect:
         def handler(request):
             if request.url.host == "web-node-02.example.test" and request.url.path == "/hr/":
                 raise httpx.ConnectError("refused")
+            if request.url.host == "web-node-02.example.test" and request.url.path == "/hfmadf/":
+                raise httpx.ConnectTimeout("no answer")
             return httpx.Response(302 if request.url.path == "/workspace/" else 200)
 
         prober = HttpxUrlProber(repo_rules.checks.url_probe.timeout_seconds,
                                 transport=httpx.MockTransport(handler))
         res = collect_url_probes(envs["PROD"], repo_rules, prober, T0)
         r = by_key(res.nodes)
-        assert r["fr_web", "web_node_02"].status is D
-        assert "connection failed" in r["fr_web", "web_node_02"].detail
+        assert r["fr_web", "web_node_02"].status is D                       # refused: service down
+        assert "connection refused" in r["fr_web", "web_node_02"].detail
+        assert r["hfm_web", "web_node_02"].status is X                      # unreachable (D26)
+        assert "not reachable from the monitoring server" in r["hfm_web", "web_node_02"].detail
         assert r["shared_services", "web_node_01"].status is U     # 302 counts as Up (Q54)
         assert {x.status for x in res.load_balancer} == {U}
