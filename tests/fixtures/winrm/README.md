@@ -16,3 +16,14 @@ addresses or accounts appear in these files.
 | `web_node_mixed.json` | Stopped, StartPending and NotFound results |
 | `single_object.json` | one result serialised as an object instead of a one-element array |
 | `not_json.txt` | PowerShell error text instead of JSON |
+
+## Disk space and event log (host query)
+
+JSON as returned by the host script in `src/hfm_dashboard/adapters/winrm_host_health.py`.
+Synthetic for now, like the files above.
+
+| File | Shows |
+|---|---|
+| `host_healthy.json` | volumes well above thresholds, no events |
+| `host_problems.json` | production DB-node disk levels (C: 8.6%, D: 11.6%, Q52), 2 Agent crash events, 1 unexpected restart |
+| `host_single_items.json` | one volume and one service serialised as objects instead of arrays |

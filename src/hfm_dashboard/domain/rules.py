@@ -109,15 +109,34 @@ class SqlServerCheck(_Strict):
         return self
 
 
+class DiskCheck(_Strict):
+    degraded_if_free_pct_below: Pct
+    down_if_free_pct_below: Pct
+
+    @model_validator(mode="after")
+    def _order(self) -> DiskCheck:
+        if self.down_if_free_pct_below > self.degraded_if_free_pct_below:
+            raise ValueError("down_if_free_pct_below must not exceed degraded_if_free_pct_below")
+        return self
+
+
+class EventLogCheck(_Strict):
+    lookback_minutes: int = Field(gt=0)
+    service_crash_event_ids: list[int] = Field(min_length=1)
+    unexpected_shutdown_event_ids: list[int]
+
+
 class Checks(_Strict):
     windows_service: WindowsServiceCheck
     url_probe: UrlProbeCheck
     weblogic_server: WeblogicServerCheck
     sql_server: SqlServerCheck
+    disk: DiskCheck
+    event_log: EventLogCheck
     confirm_down_after_consecutive_failures: int = Field(ge=1)
 
 
-CHECK_TYPES = ("windows_service", "url_probe", "weblogic_server", "sql_server")
+CHECK_TYPES = ("windows_service", "url_probe", "weblogic_server", "sql_server", "disk", "event_log")
 
 # --------------------------------------------------------------------------- 2. components
 
@@ -273,6 +292,9 @@ class Rules(_Strict):
                         )
                 elif arg:
                     raise ValueError(f"component {cid}: check {kind!r} takes no argument")
+            if "event_log" in comp.checks and "windows_service" not in comp.checks:
+                raise ValueError(f"component {cid}: event_log needs a windows_service check "
+                                 "(crash events are matched by service name)")
         return self
 
     def enabled_components(self) -> dict[str, Component]:

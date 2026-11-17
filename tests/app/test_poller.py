@@ -12,6 +12,7 @@ from datetime import timedelta
 
 import pytest
 
+from hfm_dashboard.adapters.fake_host_health import FakeHostHealthSource
 from hfm_dashboard.adapters.fake_probe import FakeUrlProber
 from hfm_dashboard.adapters.fake_services import FakeWindowsServiceSource
 from hfm_dashboard.adapters.fake_sql import FakeSqlHealthSource
@@ -46,7 +47,7 @@ def healthy_collectors(env, rules) -> Collectors:
     sql_rows = json.loads((FIXTURES / "sql" / "healthy.json").read_text())
     sql = {env.nodes["db_node_01"].host: build_observation(sql_rows, env.databases)}
     return Collectors(FakeWindowsServiceSource(states), FakeWeblogicSource(weblogic), FakeUrlProber(),
-                      FakeSqlHealthSource(sql))
+                      FakeSqlHealthSource(sql), FakeHostHealthSource())
 
 
 class Clock:
@@ -66,7 +67,7 @@ class TestScores:
     def test_healthy_is_100_green(self, envs, repo_rules):
         s = poller(envs["PROD"], repo_rules, healthy_collectors(envs["PROD"], repo_rules)).poll_once()
         assert s.score.overall_pct == 100.0 and s.score.band is Band.GREEN
-        assert len(s.results) == 16 + 3 + 6 + 1 and len(s.load_balancer) == 3
+        assert len(s.results) == 16 + 3 + 6 + 1 + 2 * 16 and len(s.load_balancer) == 3
         assert s.observed_at == T0 and s.collector_errors == ()
 
     def test_one_hfm_node_down_is_94_67_amber_after_confirmation(self, envs, repo_rules):
@@ -124,7 +125,7 @@ class TestRobustness:
             def fetch_servers(self):
                 raise RuntimeError("bug")
 
-        c = Collectors(c.services, Boom(), c.prober, c.sql)
+        c = Collectors(c.services, Boom(), c.prober, c.sql, c.host)
         s = poller(env, repo_rules, c).poll_once()
         assert s.collector_errors == ("weblogic",)
         admin = s.node_states["admin_server", "web_node_01"]
@@ -144,7 +145,7 @@ class TestRobustness:
                 return super().fetch(host)
 
         slow = Slow(c.sql.observations)
-        p = poller(env, repo_rules, Collectors(c.services, c.weblogic, c.prober, slow))
+        p = poller(env, repo_rules, Collectors(c.services, c.weblogic, c.prober, slow, c.host))
         t = threading.Thread(target=p.poll_once)
         t.start()
         assert entered.wait(5)
@@ -215,3 +216,14 @@ class TestHistory:
         p = Poller("PROD", env, repo_rules, healthy_collectors(env, repo_rules), clock=Clock(),
                    history=Broken(fail_writes=True))
         assert p.poll_once().score.overall_pct == 100.0
+
+
+def test_production_disk_levels_score(envs, repo_rules):
+    """Q52 disk levels on the DB node: SQL Server (sql check + disk) and SQL Agent (disk) Degraded."""
+    env = envs["PROD"]
+    c = healthy_collectors(env, repo_rules)
+    c.host.volumes[DB1] = {"C:": 8.6, "D:": 11.6}
+    s = poller(env, repo_rules, c).poll_once()
+    assert s.node_states["sql_server", "db_node_01"].status is G
+    assert s.node_states["sql_agent", "db_node_01"].status is G
+    assert s.score.overall_pct == 88.0 and s.score.band is Band.AMBER

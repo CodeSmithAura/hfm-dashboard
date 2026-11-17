@@ -347,3 +347,66 @@ class TestSqlServer:
         assert ev.status is G
         assert "C: 8.6% free" in ev.detail
         assert "D:" not in ev.detail
+
+
+# --------------------------------------------------------------------------- disk / event_log
+
+class TestDisk:
+    def ev(self, rules, volumes):
+        from hfm_dashboard.domain.evaluation import DiskObservation
+        return evaluate("disk", DiskObservation(volumes), rules.checks)
+
+    @pytest.mark.parametrize(("free", "expected"), [(10, U), (9.9, G), (3, G), (2.9, D)])
+    def test_bands(self, rules, free, expected):
+        assert self.ev(rules, {"C:": 50, "D:": free}).status is expected
+
+    def test_up_detail_names_lowest_volume(self, rules):
+        assert self.ev(rules, {"C:": 40, "D:": 25}).detail == "lowest D: 25% free"
+
+    def test_no_volumes_unknown(self, rules):
+        assert self.ev(rules, {}).status is X
+
+    def test_thresholds_from_rules(self, rules_dict):
+        rules_dict["checks"]["disk"]["degraded_if_free_pct_below"] = 20
+        assert self.ev(Rules.model_validate(rules_dict), {"C:": 15}).status is G
+
+    def test_threshold_order_validated(self, rules_dict):
+        rules_dict["checks"]["disk"]["down_if_free_pct_below"] = 15
+        with pytest.raises(ValidationError, match="down_if_free_pct_below"):
+            Rules.model_validate(rules_dict)
+
+    def test_shipped(self, repo_rules):
+        assert self.ev(repo_rules, {"C:": 8.6, "D:": 11.6}).status is G       # Q52 levels
+        assert self.ev(repo_rules, {"C:": 2.0}).status is D
+
+
+class TestEventLog:
+    def ev(self, rules, crashes=0, shutdowns=0):
+        from hfm_dashboard.domain.evaluation import EventLogObservation
+        return evaluate("event_log", EventLogObservation(crashes, shutdowns), rules.checks)
+
+    def test_quiet(self, rules):
+        ev = self.ev(rules)
+        assert ev.status is U and ev.detail == "no crash events in last 60 min"
+
+    def test_crash_and_restart_both_listed(self, rules):
+        ev = self.ev(rules, crashes=3, shutdowns=1)
+        assert ev.status is G
+        assert "3 service crash event(s) in last 60 min" in ev.detail and "unexpected server" in ev.detail
+
+    def test_window_from_rules(self, rules_dict):
+        rules_dict["checks"]["event_log"]["lookback_minutes"] = 15
+        assert "last 15 min" in self.ev(Rules.model_validate(rules_dict), crashes=1).detail
+
+    def test_needs_windows_service_check(self, rules_dict):
+        rules_dict["components"]["admin"]["checks"] = ["event_log"]
+        with pytest.raises(ValidationError, match="event_log needs a windows_service check"):
+            Rules.model_validate(rules_dict)
+
+    def test_shipped(self, repo_rules):
+        r = repo_rules.checks.event_log
+        assert (r.lookback_minutes, r.service_crash_event_ids, r.unexpected_shutdown_event_ids) == \
+            (60, [7031, 7034, 7023, 7024], [6008, 41])
+        enabled = repo_rules.enabled_components()
+        assert all({"disk", "event_log"} <= set(c.checks) for c in enabled.values())
+        assert "disk" not in repo_rules.components["fr_rmi"].checks

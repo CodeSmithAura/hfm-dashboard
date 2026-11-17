@@ -1,6 +1,6 @@
 """Poll one environment: run every collector, fold results into node states, score.
 
-The four collectors run in parallel (each blocks up to its own timeout). A collector that raises
+The collectors run in parallel (each blocks up to its own timeout). A collector that raises
 loses only its own checks: they are missing from the results and ``fold_poll`` counts them as
 Unknown. ``poll_once`` never runs twice at the same time for one environment; a poll that would
 overlap a running one is skipped and logged (rules.yaml url_probe timeout can equal the interval).
@@ -16,6 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from hfm_dashboard.app.host_collector import collect_host_health
 from hfm_dashboard.app.probe_collector import collect_url_probes
 from hfm_dashboard.app.service_collector import collect_windows_services
 from hfm_dashboard.app.sql_collector import collect_sql_server
@@ -34,6 +35,7 @@ from hfm_dashboard.domain.snapshot import (
 )
 from hfm_dashboard.domain.status import CheckResult, NodeState
 from hfm_dashboard.ports.history import HistoryRepository, PollRecord
+from hfm_dashboard.ports.host_health import HostHealthSource
 from hfm_dashboard.ports.sql_health import SqlHealthSource
 from hfm_dashboard.ports.url_probe import UrlProber
 from hfm_dashboard.ports.weblogic import WeblogicSource
@@ -50,6 +52,7 @@ class Collectors:
     weblogic: WeblogicSource
     prober: UrlProber
     sql: SqlHealthSource
+    host: HostHealthSource          # disk space and event log
 
 
 @dataclass(frozen=True)
@@ -122,6 +125,7 @@ class Poller:
             "weblogic": lambda: collect_weblogic(env, rules, c.weblogic, observed_at),
             "url_probes": lambda: collect_url_probes(env, rules, c.prober, observed_at),
             "sql_server": lambda: collect_sql_server(env, rules, c.sql, observed_at),
+            "host_health": lambda: collect_host_health(env, rules, c.host, observed_at),
         }
         outputs: dict[str, object] = {}
         errors: list[str] = []

@@ -119,7 +119,17 @@ Last updated: 17 Nov 2026
     monitoring server (DNS, no route, connect timeout, TLS / proxy) are Unknown; refused connections,
     read timeouts and 5xx stay Down. Consequence: a powered-off or isolated server shows Unknown on
     every check and drops out of the score, so slice 12 must warn when a node stays Unknown.
-  - Committed (`1025bdc`) on `feature/slice10-history`, pushed. D26 change on top, not committed yet.
+  - Committed (`1025bdc`, D26 change `563df18`); slices 9 and 10 merged into `main` (pull request #3, `cf6b3ff`).
+- Slice 11 (17 Nov): disk space and event log checks, 537 tests passing.
+  - Port `ports/host_health.py`; adapter `adapters/winrm_host_health.py` (one read-only script per host:
+    local volumes, System log crash / unexpected-restart events, service display names); fake
+    `adapters/fake_host_health.py`; collector `app/host_collector.py`; poller runs it as a fifth collector.
+  - rules.yaml: `checks.disk` (Degraded < 10%, Down < 3%) and `checks.event_log` (60 min; crash IDs
+    7031/7034/7023/7024, restart IDs 6008/41), `disk` and `event_log` on every enabled component
+    (ASSUMED Q60). WinRM transport shared in `adapters/winrm_runner.py`. Decision D27.
+  - With the production disk levels (Q52) the score is 88% Amber (SQL Server and SQL Agent Degraded).
+  - Access: the monitoring account needs Event Log Readers on every server (add to the A07 request).
+  - Branch `feature/slice11-disk-events`; not committed yet.
 
 ### Git
 - Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
@@ -127,9 +137,9 @@ Last updated: 17 Nov 2026
   -> `feature/slice6-weblogic` -> `feature/slice7-url-probes`, all pushed (17 Nov).
 - Slices 1-7 merged into `main` (pull request #1, merge commit `960f6b2`, 17 Nov).
 - Slice 8 merged into `main` (pull request #2, `6f8ba2e`, 17 Nov).
+- Slices 9 and 10 merged into `main` (pull request #3, `cf6b3ff`, 17 Nov).
 - Each new slice branches off `main` and merges back after review (no more stacking). Commit only
-  after review. Slice 9 on `feature/slice9-poll-loop` (pull request open); slice 10 on
-  `feature/slice10-history`, branched from slice 9.
+  after review. Slice 11 on `feature/slice11-disk-events`.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
@@ -140,14 +150,15 @@ Last updated: 17 Nov 2026
 - Q55 (production secret store) open with infrastructure / security; Q56 (non-prod WebLogic names) assumed.
 - Q57 (how a load-balancer probe failure counts) open with the application team, high priority;
   Q58 (managed-server scheme for direct probes) assumed. Q59 (backup check / schedule) assumed.
+- Q60 (disk / event log thresholds, and whether low disk lowers every component on a server) assumed.
 - Dev environment note: on this workstation Python 3.12 and git are not on PATH in new shells; use
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps (resume here)
-1. Merge slice 9; review and commit slice 10; push and open its pull request.
+1. Review and commit slice 11; push and open its pull request.
 2. When masked outputs arrive: add them to `tests/fixtures/winrm/` (and later `weblogic/`) and run the
    parse tests against them; fix an adapter if the real output differs from the synthetic format.
-3. Remaining slices, in order: 11 disk space and event log checks (WinRM); 12 notice engine (pure state
+3. Remaining slices, in order: 12 notice engine (pure state
    machine, close calendar, maintenance, root-cause grouping, warning for nodes Unknown too long); 13 email (SMTP) and owners.yaml;
    14 dashboard (FastAPI); 15 HTTPS and AD login; 16 login probe (Playwright); 17 Windows service.
 4. Open a pull request for `feature/build1-core` to `main` when convenient.

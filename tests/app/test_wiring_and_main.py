@@ -40,6 +40,8 @@ class TestWiring:
         assert isinstance(c.weblogic, WeblogicRestSource)
         assert isinstance(c.prober, HttpxUrlProber)
         assert isinstance(c.sql, OdbcSqlHealthSource)          # windows auth: no secret needed
+        from hfm_dashboard.adapters.winrm_host_health import WinRMHostHealthSource
+        assert isinstance(c.host, WinRMHostHealthSource)
 
     def test_missing_weblogic_secret_gives_unknown_not_crash(self, prod, repo_rules):
         c = build_collectors(prod, repo_rules, FakeSecretStore())

@@ -36,7 +36,7 @@ class TestExpected:
         exp = expected_checks(envs["PROD"], repo_rules)
         assert len(exp) == 16
         assert exp["shared_services", "web_node_02"] == ("windows_service", "weblogic_server",
-                                                         "url_probe:workspace_login")
+                                                         "url_probe:workspace_login", "disk", "event_log")
         assert ("fr_rmi", "web_node_01") not in exp
 
     def test_nonprod_scope(self, envs, repo_rules):

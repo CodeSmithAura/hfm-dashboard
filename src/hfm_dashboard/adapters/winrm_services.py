@@ -1,8 +1,6 @@
 """Windows services over WinRM (PowerShell remoting via pypsrp). Read-only: ``Get-Service`` only.
 
-Authentication uses the identity the monitoring service runs as (the read-only gMSA, A07) through
-Negotiate/Kerberos, so no password is stored. An explicit credential can be passed for development
-testing against non-prod servers (decision D11: never in production).
+Transport, authentication and error texts: ``winrm_runner.WinRMRunner``.
 
 A service is matched by Name first, then by DisplayName (both case-insensitive), because some
 names in environments.yaml were recorded from the DisplayName column during discovery.
@@ -12,9 +10,10 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from typing import Any
 
+from hfm_dashboard.adapters.winrm_runner import Credential, WinRMRunError, WinRMRunner
+from hfm_dashboard.adapters.winrm_runner import default_client_factory as _default_client_factory
 from hfm_dashboard.domain.environment import WinRM
 from hfm_dashboard.ports.windows_services import NOT_FOUND, ServiceQueryError
 
@@ -65,23 +64,6 @@ def parse_output(service_names: Sequence[str], output: str) -> dict[str, str]:
     return {n: states[n] for n in service_names}
 
 
-@dataclass(frozen=True, slots=True)
-class Credential:
-    """Development testing only (D11). Never logged; repr hides the password."""
-
-    username: str
-    password: str
-
-    def __repr__(self) -> str:
-        return f"Credential(username={self.username!r}, password=***)"
-
-
-def _default_client_factory(host: str, **kwargs: Any):
-    from pypsrp.client import Client  # imported lazily so tests do not need a WinRM stack
-
-    return Client(host, **kwargs)
-
-
 class WinRMServiceSource:
     def __init__(
         self,
@@ -91,54 +73,17 @@ class WinRMServiceSource:
         client_factory: Callable[..., Any] = _default_client_factory,
         on_output: Callable[[str, str], None] | None = None,
     ) -> None:
-        self._settings = settings
-        self._timeout = timeout_seconds
-        self._credential = credential
-        self._client_factory = client_factory
-        self._on_output = on_output   # (host, raw script output) - used to record sample responses
+        self._runner = WinRMRunner(settings, timeout_seconds, credential, client_factory, on_output)
 
     def _client_kwargs(self) -> dict[str, Any]:
-        kwargs: dict[str, Any] = {
-            "port": self._settings.port,
-            "ssl": self._settings.use_ssl,
-            "auth": self._settings.auth,
-            "cert_validation": self._settings.cert_validation,
-            "connection_timeout": self._timeout,
-            "operation_timeout": self._timeout,
-            "read_timeout": self._timeout + 5,   # must exceed operation_timeout (WinRM requirement)
-        }
-        if self._credential is not None:
-            kwargs["username"] = self._credential.username
-            kwargs["password"] = self._credential.password
-        return kwargs
+        return self._runner.client_kwargs()
 
     def query(self, host: str, service_names: Sequence[str]) -> dict[str, str]:
         if not service_names:
             return {}
         try:
-            client = self._client_factory(host, **self._client_kwargs())
-            with client:
-                output, streams, had_errors = client.execute_ps(build_script(service_names))
-        except ServiceQueryError:
-            raise
-        except Exception as exc:  # noqa: BLE001 - every transport failure means "cannot check"
-            raise ServiceQueryError(_describe(exc)) from exc
-        if self._on_output is not None:
-            self._on_output(host, output)
-        if had_errors:
-            raise ServiceQueryError("service query reported an error on the host")
+            output = self._runner.run(host, build_script(service_names))
+        except WinRMRunError as exc:
+            reason = str(exc).replace("query reported", "service query reported")
+            raise ServiceQueryError(reason) from exc
         return parse_output(service_names, output)
-
-
-def _describe(exc: Exception) -> str:
-    """Short, secret-free reason. Exception text is not used: it can carry user or URL details."""
-    name = type(exc).__name__
-    if name == "AuthenticationError":
-        return "WinRM authentication failed"
-    if name in {"WSManFaultError"}:
-        return "WinRM refused the request (access rights?)"
-    if "Timeout" in name:
-        return "WinRM timed out"
-    if name in {"WinRMTransportError", "ConnectionError", "ConnectTimeout", "SSLError"}:
-        return f"WinRM not reachable ({name})"
-    return f"WinRM query failed ({name})"
