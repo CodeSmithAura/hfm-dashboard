@@ -11,7 +11,7 @@ No I/O, no clock, no globals: every number comes from ``Rules``.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -53,13 +53,23 @@ class StabilityScore:
 NodeStatuses = Mapping[str, Mapping[str, Status]]   # component -> node -> confirmed status
 
 
-def score(node_statuses: NodeStatuses, rules: Rules) -> StabilityScore:
-    """Score the application. Nodes missing from ``node_statuses`` count as Unknown."""
+def score(
+    node_statuses: NodeStatuses,
+    rules: Rules,
+    component_nodes: Mapping[str, Sequence[str]] | None = None,
+) -> StabilityScore:
+    """Score the application. Nodes missing from ``node_statuses`` count as Unknown.
+
+    ``component_nodes`` limits each component to the nodes an environment actually has (a smaller
+    non-prod environment, decision D18); by default every rules.yaml node is in scope.
+    """
     enabled = rules.enabled_components()
-    _reject_unexpected(node_statuses, rules)
+    scope = {cid: list(component_nodes.get(cid, comp.nodes)) if component_nodes is not None
+             else list(comp.nodes) for cid, comp in enabled.items()}
+    _reject_unexpected(node_statuses, rules, scope)
 
     components = {
-        cid: _score_component(cid, node_statuses.get(cid, {}), rules) for cid in enabled
+        cid: _score_component(cid, node_statuses.get(cid, {}), rules, scope[cid]) for cid in enabled
     }
 
     known = [c for c in components.values() if c.score_pct is not None]
@@ -97,9 +107,10 @@ def band_for(pct: float | None, rules: Rules) -> Band:
     return Band.RED
 
 
-def _score_component(cid: str, reported: Mapping[str, Status], rules: Rules) -> ComponentScore:
+def _score_component(cid: str, reported: Mapping[str, Status], rules: Rules,
+                     in_scope: Sequence[str]) -> ComponentScore:
     comp = rules.components[cid]
-    nodes = {node: reported.get(node, Status.UNKNOWN) for node in comp.nodes}
+    nodes = {node: reported.get(node, Status.UNKNOWN) for node in in_scope}
 
     if rules.scoring.unknown_nodes == "count_as_down":
         effective = [Status.DOWN if s is Status.UNKNOWN else s for s in nodes.values()]
@@ -130,12 +141,13 @@ def _score_component(cid: str, reported: Mapping[str, Status], rules: Rules) -> 
     )
 
 
-def _reject_unexpected(node_statuses: NodeStatuses, rules: Rules) -> None:
-    """A status for a component or node rules.yaml does not monitor is a wiring bug: fail loudly."""
+def _reject_unexpected(node_statuses: NodeStatuses, rules: Rules,
+                       scope: Mapping[str, Sequence[str]]) -> None:
+    """A status for a component or node not in scope is a wiring bug: fail loudly."""
     enabled = rules.enabled_components()
     for cid, nodes in node_statuses.items():
         if cid not in enabled:
             raise ValueError(f"status reported for unmonitored component {cid!r}")
-        extra = set(nodes) - set(enabled[cid].nodes)
+        extra = set(nodes) - set(scope[cid])
         if extra:
             raise ValueError(f"component {cid!r}: status reported for unknown nodes {sorted(extra)}")

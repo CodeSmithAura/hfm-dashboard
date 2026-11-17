@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import socket
 import ssl
 
 import httpx
@@ -61,18 +62,47 @@ class TestProbe:
         obs = prober(handler).probe(URL)
         assert obs.timed_out and obs.http_status is None
 
-    @pytest.mark.parametrize(("exc", "expected"), [
-        (httpx.ConnectError("refused web-node-01.example.test"), "connection failed"),
-        (httpx.RemoteProtocolError("bad web-node-01.example.test"), "closed the connection"),
-        (httpx.ProxyError("proxy web-node-01.example.test"), "request failed (ProxyError)"),
+    def test_read_timeout_is_down_side(self):
+        def handler(request):
+            raise httpx.ReadTimeout("slow")
+        obs = prober(handler).probe(URL)
+        assert obs.timed_out and not obs.unreachable
+
+    def test_connect_timeout_is_unreachable(self):
+        def handler(request):
+            raise httpx.ConnectTimeout("no SYN-ACK")
+        obs = prober(handler).probe(URL)
+        assert obs.unreachable and not obs.timed_out and "connect timeout" in obs.error
+
+
+def _connect_error(cause):
+    try:
+        raise httpx.ConnectError("[e] while connecting to web-node-01.example.test") from cause
+    except httpx.ConnectError as exc:
+        return exc
+
+
+class TestClassification:
+    @pytest.mark.parametrize(("exc", "reason", "unreachable"), [
+        (_connect_error(ConnectionRefusedError(10061, "actively refused")), "connection refused", False),
+        (_connect_error(OSError(111, "Connection refused")), "connection refused", False),
+        (_connect_error(socket.gaierror(11001, "getaddrinfo failed")), "could not be resolved", True),
+        (_connect_error(OSError(10065, "host unreachable")), "network or host unreachable", True),
+        (_connect_error(OSError(10051, "network unreachable")), "network or host unreachable", True),
+        (_connect_error(ssl.SSLCertVerificationError("certificate verify failed")), "TLS / certificate", True),
+        (httpx.ConnectError("refused by web-node-01.example.test"), "connection refused", False),
+        (httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED]"), "TLS / certificate", True),
+        (httpx.ConnectError("something odd"), "could not connect", True),
+        (httpx.RemoteProtocolError("peer closed web-node-01.example.test"), "closed the connection", False),
+        (httpx.ProxyError("proxy web-node-01.example.test"), "proxy error", True),
     ])
-    def test_network_errors_without_url(self, exc, expected):
+    def test_failures(self, exc, reason, unreachable):
         def handler(request):
             raise exc
         obs = prober(handler).probe(URL)
         assert obs.http_status is None and not obs.timed_out
-        assert expected in obs.error and "example.test" not in obs.error
-        assert obs.elapsed_seconds is not None
+        assert reason in obs.error and obs.unreachable is unreachable
+        assert "example.test" not in obs.error
 
 
 class TestTls:

@@ -128,6 +128,16 @@ class TestUrlProbe:
         assert ev.status is D
         assert "connection refused" in ev.detail
 
+    def test_unreachable_is_unknown(self, rules):
+        ev = self.ev(rules, http_status=None, elapsed_seconds=0.1, unreachable=True,
+                     error="host name could not be resolved")
+        assert ev.status is X
+        assert ev.detail == "not reachable from the monitoring server: host name could not be resolved"
+
+    def test_refused_stays_down(self, rules):
+        ev = self.ev(rules, http_status=None, elapsed_seconds=0.1, error="connection refused")
+        assert ev.status is D
+
     def test_missing_elapsed_is_unknown_unless_worse(self, rules):
         assert self.ev(rules, elapsed_seconds=None).status is X
         assert self.ev(rules, elapsed_seconds=None, http_status=404).status is G
