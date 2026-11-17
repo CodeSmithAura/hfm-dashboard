@@ -158,7 +158,21 @@ Last updated: 17 Nov 2026
   - `hfm-dashboard --test-email ENV` sends one test message to the monitoring team. Decision D29.
   - Tested with a fake SMTP object and a real smtplib session against a local test server.
   - Real sending needs the owner list (Q32 / A04) and relay access (A13).
-  - Branch `feature/slice13-email`; not committed yet.
+  - Committed (`1645f41`), merged into `main` (pull request #6, `3d2ba95`).
+- Dashboard mockup (17 Nov): clickable canvas with desktop, tablet and phone widths and sample
+  scenarios; layout agreed by the user.
+- Slice 14 (17 Nov): dashboard web app, 687 tests passing.
+  - `presentation/dashboard.py` (pure view model: statuses, labels, order, durations, banners);
+    `/api/v1/environments/{env}/dashboard` serves it as JSON (contract 1, `docs/ui.md`).
+  - `web/app.py` (FastAPI): page per environment with cell detail (`?sel=`), self-refresh every poll,
+    `/healthz`; logic-free Jinja templates and a CSS-variable theme (dark default, light toggle) following
+    the mockup; fluid down to phone width. `--ui-dir` overrides templates/static without code changes.
+  - Security: CSP 'self' only, no inline styles/scripts, no external resources, escaped output, static
+    files confined, no API docs. Times shown in the viewer's local time.
+  - Runs in the service (uvicorn thread); `monitoring.dashboard_bind` / `dashboard_port` placeholders in
+    the environment template; `--no-web`. Read-only: maintenance entry comes with login (slice 15).
+  - Tested end to end with a real uvicorn server on localhost while polling. Decision D30.
+  - Branch `feature/slice14-dashboard`; not committed yet.
 
 ### Git
 - Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
@@ -168,7 +182,7 @@ Last updated: 17 Nov 2026
 - Slice 8 merged into `main` (pull request #2, `6f8ba2e`, 17 Nov).
 - Slices 9 and 10 merged into `main` (pull request #3, `cf6b3ff`, 17 Nov).
 - Each new slice branches off `main` and merges back after review (no more stacking). Commit only
-  after review. Slice 12 merged (pull request #5). Slice 13 on `feature/slice13-email`.
+  after review. Slice 13 merged (pull request #6). Slice 14 on `feature/slice14-dashboard`.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
@@ -185,10 +199,10 @@ Last updated: 17 Nov 2026
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps (resume here)
-1. Review and commit slice 13; push and open its pull request.
+1. Review and commit slice 14; push and open its pull request.
 2. When masked outputs arrive: add them to `tests/fixtures/winrm/` (and later `weblogic/`) and run the
    parse tests against them; fix an adapter if the real output differs from the synthetic format.
-3. Remaining slices, in order: 14 dashboard (FastAPI); 15 HTTPS and AD login; 16 login probe (Playwright); 17 Windows service.
+3. Remaining slices, in order: 15 HTTPS, Windows/AD login (viewer/admin) and maintenance-window entry; 16 login probe (Playwright); 17 Windows service.
 4. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
    not covered by rules.yaml yet.
 5. Tell the application team that with the current assumed weights (Q26) one HFM node down gives

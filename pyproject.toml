@@ -15,10 +15,13 @@ dependencies = [
     "truststore>=0.9",      # verify TLS against the Windows certificate store (corporate CA)
     "pyodbc>=5.1",          # SQL Server health queries (needs ODBC Driver 18 for SQL Server at runtime)
     "APScheduler>=3.10,<4", # poll scheduling (3.x API)
+    "fastapi>=0.110",       # dashboard web app and JSON API
+    "uvicorn>=0.29",        # dashboard web server
+    "jinja2>=3.1",          # dashboard templates (replaceable, see docs/ui.md)
 ]
 
 [project.optional-dependencies]
-# Added slice by slice as adapters arrive: fastapi, playwright
+# Added slice by slice as adapters arrive: playwright
 dev = ["pytest>=8"]
 
 [project.scripts]
@@ -27,6 +30,9 @@ hfm-dashboard = "hfm_dashboard.app.main:run"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+hfm_dashboard = ["web/templates/*.html", "web/templates/partials/*.html", "web/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

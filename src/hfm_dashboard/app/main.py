@@ -25,10 +25,12 @@ from datetime import UTC, datetime, timedelta
 from hfm_dashboard.adapters.env_secrets import EnvironmentSecretStore
 from hfm_dashboard.adapters.smtp_mail import SmtpMailSender
 from hfm_dashboard.adapters.sqlite_history import SqliteHistory
+from hfm_dashboard.app.dashboard_source import LiveDashboardSource
 from hfm_dashboard.app.notice_mailer import NoticeMailer
 from hfm_dashboard.app.notice_tracker import NoticeTracker
 from hfm_dashboard.app.poller import Collectors, Poller, PollSnapshot
 from hfm_dashboard.app.scheduler import build_scheduler
+from hfm_dashboard.app.web_server import WebServer
 from hfm_dashboard.app.wiring import build_collectors
 from hfm_dashboard.config.owners_loader import OwnersError, load_owners
 from hfm_dashboard.config.startup import ConfigurationError, load_configuration
@@ -110,6 +112,8 @@ def main(
     p.add_argument("--data-dir", type=Path, default=Path("data"), help="folder for history.sqlite")
     p.add_argument("--no-history", action="store_true", help="do not read or write the history store")
     p.add_argument("--test-email", metavar="ENV", help="send one test email to the monitoring team, exit")
+    p.add_argument("--no-web", action="store_true", help="poll without serving the dashboard")
+    p.add_argument("--ui-dir", type=Path, help="folder with templates/ and static/ overriding the built-in UI")
     args = p.parse_args(argv)
 
     try:
@@ -187,7 +191,16 @@ def main(
     stop = stop or threading.Event()
     scheduler = build_scheduler(pollers, rules.collection.poll_interval_seconds, report,
                                 purge=purge if history is not None else None)
+    web = None
+    if not args.no_web:
+        from hfm_dashboard.web.app import create_app
+        envs = config.environments.environments
+        source = LiveDashboardSource({p.name: p for p in pollers}, {n: envs[n] for n in names}, history)
+        mon = config.environments.monitoring
+        web = WebServer(create_app(source, rules, ui_dir=args.ui_dir), mon.dashboard_bind, mon.dashboard_port)
     scheduler.start()
+    if web is not None:
+        web.start()
     log.info("polling %s every %s s", ", ".join(names), rules.collection.poll_interval_seconds)
     try:
         while not stop.wait(1.0):
@@ -195,6 +208,8 @@ def main(
     except KeyboardInterrupt:
         pass
     finally:
+        if web is not None:
+            web.stop()
         scheduler.shutdown(wait=True)
     return 0
 

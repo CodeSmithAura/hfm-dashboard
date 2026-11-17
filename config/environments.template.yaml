@@ -199,4 +199,6 @@ environments:
 
 monitoring:
   monitor_host: "{{MONITOR_HOST}}"
+  dashboard_bind: "{{DASHBOARD_BIND}}"   # interface the dashboard listens on
+  dashboard_port: "{{DASHBOARD_PORT}}"
   # Polling, thresholds, scoring and notice timings live in rules.yaml (single source)

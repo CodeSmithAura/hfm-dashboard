@@ -63,9 +63,18 @@ Notices of environments with `notices_enabled: false` are only logged. Check del
 When updating the code on the server, update `config/rules.yaml` too: new keys are required and the
 program refuses to start on an outdated file.
 
+## Dashboard
+
+Served by the same service at `monitoring.dashboard_bind` / `dashboard_port` from `environments.yaml`
+(`--no-web` to poll without it). JSON for other tools: `/api/v1/environments/{env}/dashboard`;
+health check: `/healthz`. The look is replaceable without code changes: override files with
+`--ui-dir <folder>` (see `docs/ui.md`). HTTPS and Windows login follow in slice 15 - until then keep
+the port reachable only from trusted networks.
+
 ## Layout
 
 Layout: `src/hfm_dashboard/domain` (status model, rules and environment models, check evaluation,
 scoring - no I/O), `config/` (YAML loading, start-up gate), `ports/` (interfaces to external
-systems), `adapters/` (WinRM, ... and their fakes), `app/` (collectors), `tools/` (operator commands). Tests mirror it under
+systems), `adapters/` (WinRM, ... and their fakes), `app/` (collectors, poller, wiring), `presentation/`
+(dashboard view model), `web/` (FastAPI app, templates, theme), `tools/` (operator commands). Tests mirror it under
 `tests/`; masked sample responses live in `tests/fixtures/`.
