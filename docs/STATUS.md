@@ -94,15 +94,28 @@ Last updated: 17 Nov 2026
   - Synthetic query samples in `tests/fixtures/sql/`; `production_disks.json` reproduces Q52 (C: 8.6%
     free -> Degraded). Not run against a real instance yet (A10); the monitoring server needs
     ODBC Driver 18 installed.
-  - Not committed yet.
+  - Committed (`fed1254`), merged into `main` (pull request #2).
+- Slice 9 (17 Nov): poll loop, 467 tests passing.
+  - `domain/snapshot.py` (pure): expected checks per node, `fold_poll` (worst check, missing check =
+    Unknown, flap protection), scoring limited to the environment's nodes (`score(..., component_nodes)`).
+  - `app/poller.py`: four collectors in parallel per poll, node states kept between polls, snapshot
+    with results, load-balancer results (not scored), node states and score; overlapping polls skipped.
+  - `app/wiring.py`: real adapters from configuration; a missing credential makes only that collector
+    Unknown. `app/scheduler.py`: APScheduler job per environment, no overlap, missed runs coalesced.
+  - `hfm-dashboard` entry point (`--once`, `--env`); library INFO logs lowered; UTC log timestamps.
+  - Tests pin the numbers for the application team: one HFM node down 94.67% Amber, Admin Server down
+    96% Green, SQL Server down capped 0% Red. Decision D24.
+  - Smoke-tested with real adapters against invented hosts: every check Unknown with its reason.
+  - Branch `feature/slice9-poll-loop`; not committed yet.
 
 ### Git
 - Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
 - Slices 1-7 are a straight line of commits: `feature/build1-core` (1-4) -> `feature/slice5-service-check`
   -> `feature/slice6-weblogic` -> `feature/slice7-url-probes`, all pushed (17 Nov).
 - Slices 1-7 merged into `main` (pull request #1, merge commit `960f6b2`, 17 Nov).
+- Slice 8 merged into `main` (pull request #2, `6f8ba2e`, 17 Nov).
 - Each new slice branches off `main` and merges back after review (no more stacking). Commit only
-  after review. Slice 8 on `feature/slice8-sql-server`.
+  after review. Slice 9 on `feature/slice9-poll-loop`.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
@@ -117,11 +130,12 @@ Last updated: 17 Nov 2026
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps (resume here)
-1. Review and commit slice 8; push and open a pull request to `main`.
+1. Review and commit slice 9; push and open a pull request to `main`.
 2. When masked outputs arrive: add them to `tests/fixtures/winrm/` (and later `weblogic/`) and run the
    parse tests against them; fix an adapter if the real output differs from the synthetic format.
-3. Next: the poll loop wiring all collectors -> node state (flap protection) -> scoring, with no
-   overlapping polls (see slice 7); then status history (SQLite), notices and the dashboard.
+3. Next slices: status history in SQLite behind a repository port (node states survive restarts,
+   90-day retention); notice engine (state machine per component, close calendar, maintenance);
+   dashboard (FastAPI); Windows service wrapper.
 4. Open a pull request for `feature/build1-core` to `main` when convenient.
 5. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
    not covered by rules.yaml yet.

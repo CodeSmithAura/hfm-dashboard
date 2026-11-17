@@ -33,6 +33,19 @@ environment's block is filled in. Output shows node keys, not host names.
 user name and IP addresses masked; nothing is written if anything real is left. Review the files,
 then copy them to `tests/fixtures/winrm/`. Exit code: 0 all Up, 1 something not Up, 2 config problem.
 
+## Running the monitor
+
+```
+.venv\Scripts\hfm-dashboard --config-dir config --once            # one poll per environment, print scores
+.venv\Scripts\hfm-dashboard --config-dir config --once --env NONPROD
+.venv\Scripts\hfm-dashboard --config-dir config                   # poll every poll_interval_seconds until Ctrl+C
+```
+
+Refuses to start on any configuration problem (exit code 2). Credentials come from environment
+variables named after each secret in `environments.yaml` (interim until Q55), e.g.
+`HFM_MON_PROD_WEBLOGIC_USERNAME` / `HFM_MON_PROD_WEBLOGIC_PASSWORD`; a missing one makes only that
+collector's checks Unknown. SQL Server needs ODBC Driver 18 on the monitoring server.
+
 ## Layout
 
 Layout: `src/hfm_dashboard/domain` (status model, rules and environment models, check evaluation,
