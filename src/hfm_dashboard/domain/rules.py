@@ -91,13 +91,14 @@ class WeblogicServerCheck(StateMapCheck):
 
 class SqlServerCheck(_Strict):
     down_if_service_not_running: bool
+    timeout_seconds: int = Field(gt=0)   # connection and per-query timeout
     degraded_if_blocking_longer_than_minutes: float = Field(gt=0)
     degraded_if_deadlocks_in_15_min_above: int = Field(ge=0)
     degraded_if_log_used_pct_above: Pct
     degraded_if_tempdb_used_pct_above: Pct
     degraded_if_disk_free_pct_below: Pct
     down_if_disk_free_pct_below: Pct
-    degraded_if_backup_failed_in_last_hours: float = Field(gt=0)
+    degraded_if_no_backup_in_last_hours: float = Field(gt=0)   # full or differential, per EPM database
     degraded_if_agent_job_failed_in_last_hours: float = Field(gt=0)
     degraded_if_query_running_longer_than_minutes: float = Field(gt=0)
 
@@ -250,7 +251,7 @@ class Rules(_Strict):
     def _cross_references(self) -> Rules:
         if not any(c.enabled for c in self.components.values()):
             raise ValueError("no enabled components")
-        for kind in ("windows_service", "weblogic_server"):
+        for kind in ("windows_service", "weblogic_server", "sql_server"):
             if getattr(self.checks, kind).timeout_seconds >= self.collection.poll_interval_seconds:
                 raise ValueError(f"checks.{kind}.timeout_seconds must be below "
                                  "collection.poll_interval_seconds")

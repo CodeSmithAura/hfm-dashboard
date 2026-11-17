@@ -48,13 +48,14 @@ checks:
 
   sql_server:                            # basis: checks CONFIRMED Q14, thresholds ASSUMED Q14
     down_if_service_not_running: true
+    timeout_seconds: 20                  # ASSUMED Q40 - connection and per-query timeout; must stay below poll_interval_seconds
     degraded_if_blocking_longer_than_minutes: 5
     degraded_if_deadlocks_in_15_min_above: 5
     degraded_if_log_used_pct_above: 90
     degraded_if_tempdb_used_pct_above: 90
     degraded_if_disk_free_pct_below: 10
     down_if_disk_free_pct_below: 3
-    degraded_if_backup_failed_in_last_hours: 24
+    degraded_if_no_backup_in_last_hours: 24             # ASSUMED Q59 - no successful full/differential backup of an EPM database
     degraded_if_agent_job_failed_in_last_hours: 24
     degraded_if_query_running_longer_than_minutes: 60   # consolidations can be long; tune after shadow mode
 

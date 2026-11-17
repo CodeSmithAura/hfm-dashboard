@@ -66,6 +66,12 @@ environments:
         hfm_web:         { port: hfm_web,    path: "/hfmadf/" }
         fr_web:          { port: fr_web,     path: "/hr/" }
 
+    sql:                             # SQL Server health queries (A10: read-only login with VIEW SERVER STATE, msdb read)
+      port: sql                      # key in ports above
+      auth: windows                  # windows = the service's gMSA (no password); sql = secrets.sql_monitor_login
+      encrypt: true
+      trust_server_certificate: false
+
     services:                        # Windows service name on each node (Q15) - all discovered 3 Nov
       ohs_load_balancer:
         web_node_01: "OHS"
@@ -156,6 +162,12 @@ environments:
         workspace_login: { port: foundation, path: "/workspace/" }
         hfm_web:         { port: hfm_web,    path: "/hfmadf/" }
         fr_web:          { port: fr_web,     path: "/hr/" }
+
+    sql:                             # SQL Server health queries (A10: read-only login with VIEW SERVER STATE, msdb read)
+      port: sql                      # key in ports above
+      auth: windows                  # windows = the service's gMSA (no password); sql = secrets.sql_monitor_login
+      encrypt: true
+      trust_server_certificate: false
 
     services:                        # all discovered on the development hosts
       ohs_load_balancer: { web_node_01: "OHS" }

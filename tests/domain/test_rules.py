@@ -160,3 +160,17 @@ class TestWeblogicTimeout:
     def test_shipped_value(self, repo_rules):
         assert repo_rules.checks.weblogic_server.timeout_seconds == 20   # ASSUMED Q40
 
+
+class TestSqlServerTimeout:
+    def test_must_be_below_poll_interval(self, rules_dict):
+        rules_dict["checks"]["sql_server"]["timeout_seconds"] = 90
+        invalid(rules_dict, "sql_server.timeout_seconds must be below")
+
+    def test_shipped_values(self, repo_rules):
+        assert repo_rules.checks.sql_server.timeout_seconds == 20                 # ASSUMED Q40
+        assert repo_rules.checks.sql_server.degraded_if_no_backup_in_last_hours == 24   # ASSUMED Q59
+
+    def test_old_backup_key_rejected(self, rules_dict):
+        rules_dict["checks"]["sql_server"]["degraded_if_backup_failed_in_last_hours"] = 24
+        invalid(rules_dict, "degraded_if_backup_failed_in_last_hours")
+
