@@ -17,11 +17,13 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from hfm_dashboard.app.host_collector import collect_host_health
+from hfm_dashboard.app.notice_tracker import NoticeTracker
 from hfm_dashboard.app.probe_collector import collect_url_probes
 from hfm_dashboard.app.service_collector import collect_windows_services
 from hfm_dashboard.app.sql_collector import collect_sql_server
 from hfm_dashboard.app.weblogic_collector import collect_weblogic
 from hfm_dashboard.domain.environment import Environment
+from hfm_dashboard.domain.notices import Notice
 from hfm_dashboard.domain.rules import Rules
 from hfm_dashboard.domain.scoring import StabilityScore, score
 from hfm_dashboard.domain.snapshot import (
@@ -66,6 +68,7 @@ class PollSnapshot:
     score: StabilityScore
     collector_errors: tuple[str, ...] = field(default=())   # collectors that raised (names only)
     transitions: tuple[Transition, ...] = field(default=())  # confirmed status changes this poll
+    notices: tuple[Notice, ...] = field(default=())          # caution notices produced this poll
 
 
 class Poller:
@@ -78,6 +81,7 @@ class Poller:
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         monotonic: Callable[[], float] = time.monotonic,
         history: HistoryRepository | None = None,
+        notices: NoticeTracker | None = None,
     ) -> None:
         self.name = name
         self._env = env
@@ -88,6 +92,7 @@ class Poller:
         self._expected = expected_checks(env, rules)
         self._scope = component_nodes(env, rules)
         self._history = history
+        self._notices = notices
         self._states: dict[NodeKey, NodeState] = self._restore()
         self._running = threading.Lock()
         self.latest: PollSnapshot | None = None
@@ -150,6 +155,14 @@ class Poller:
         previous = self._states
         self._states = fold_poll(previous, results, self._expected, rules, observed_at)
         changes = transitions(previous, self._states, observed_at)
+        stability = score(node_statuses(self._states), rules, self._scope)
+        produced: list[Notice] = []
+        if self._notices is not None:
+            try:
+                produced = self._notices.process(observed_at, self._states,
+                                                 {cid: c.status for cid, c in stability.components.items()})
+            except Exception as exc:  # noqa: BLE001 - notices must never stop monitoring
+                log.error("%s: notice engine failed (%s)", self.name, type(exc).__name__)
         snapshot = PollSnapshot(
             environment=self.name,
             observed_at=observed_at,
@@ -157,9 +170,10 @@ class Poller:
             results=tuple(results),
             load_balancer=tuple(lb),
             node_states=dict(self._states),
-            score=score(node_statuses(self._states), rules, self._scope),
+            score=stability,
             collector_errors=tuple(errors),
             transitions=tuple(changes),
+            notices=tuple(produced),
         )
         self.latest = snapshot
         self._save(snapshot)

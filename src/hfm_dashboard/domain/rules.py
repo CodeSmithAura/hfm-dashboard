@@ -204,8 +204,10 @@ class Notices(_Strict):
     repeat_every_minutes: float = Field(gt=0)
     escalate_to_manager_after_minutes: float = Field(gt=0)
     notify_on_degraded: bool
+    notify_on_partial_outage: bool       # a Down node notifies although the component is only Degraded
+    warn_when_unknown_after_minutes: float = Field(gt=0)
     send_recovery_notice: bool
-    require_acknowledgement: bool
+    require_acknowledgement: Literal[False]   # acknowledgement needs the dashboard (not built yet)
     group_downstream_under_root_cause: bool
     include_restart_guidance: bool
     auto_restart: Literal[False]  # hard rule 3: read-only against HFM

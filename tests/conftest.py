@@ -118,6 +118,8 @@ _BASE: dict[str, Any] = {
         "repeat_every_minutes": 30,
         "escalate_to_manager_after_minutes": 60,
         "notify_on_degraded": False,
+        "notify_on_partial_outage": True,
+        "warn_when_unknown_after_minutes": 15,
         "send_recovery_notice": True,
         "require_acknowledgement": False,
         "group_downstream_under_root_cause": True,

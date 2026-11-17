@@ -50,6 +50,12 @@ History (poll scores, node states, status changes) is kept in `<data-dir>/histor
 (default `data/`), restored after a restart and purged after `history_retention_days`.
 Use `--data-dir <folder>` to place it, or `--no-history` for a dry run that writes nothing.
 
+Caution notices are worked out every poll (rules.yaml `notices:`) and printed as `NOTICE` lines; email delivery
+arrives with slice 13. Notices of environments with `notices_enabled: false` are only logged.
+
+When updating the code on the server, update `config/rules.yaml` too: new keys are required and the
+program refuses to start on an outdated file.
+
 ## Layout
 
 Layout: `src/hfm_dashboard/domain` (status model, rules and environment models, check evaluation,

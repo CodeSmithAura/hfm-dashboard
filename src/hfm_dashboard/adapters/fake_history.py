@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from hfm_dashboard.domain.notices import ComponentNoticeState, Notice
 from hfm_dashboard.domain.snapshot import NodeKey, Transition
 from hfm_dashboard.domain.status import NodeState
 from hfm_dashboard.ports.history import HistoryError, PollRecord
@@ -15,6 +16,8 @@ class FakeHistory:
         self.poll_rows: list[PollRecord] = []
         self.states: dict[str, dict[NodeKey, NodeState]] = {}
         self.changes: dict[str, list[Transition]] = {}
+        self.notice_states: dict[str, dict[str, ComponentNoticeState]] = {}
+        self.notice_log: list[tuple[Notice, bool, str]] = []
 
     def save_poll(self, record: PollRecord, states: dict[NodeKey, NodeState],
                   changes: list[Transition]) -> None:
@@ -38,3 +41,19 @@ class FakeHistory:
         self.poll_rows = [p for p in self.poll_rows if p.observed_at >= cutoff]
         self.changes = {e: [t for t in v if t.at >= cutoff] for e, v in self.changes.items()}
         return before - len(self.poll_rows) - sum(len(v) for v in self.changes.values())
+
+    def save_notice_states(self, environment: str, states: dict[str, ComponentNoticeState]) -> None:
+        if self.fail_writes:
+            raise HistoryError("cannot write notice states (FakeError)")
+        self.notice_states[environment] = dict(states)
+
+    def load_notice_states(self, environment: str) -> dict[str, ComponentNoticeState]:
+        return dict(self.notice_states.get(environment, {}))
+
+    def record_notices(self, notices: list[Notice], delivered: bool, note: str = "") -> None:
+        if self.fail_writes:
+            raise HistoryError("cannot write notices (FakeError)")
+        self.notice_log += [(n, delivered, note) for n in notices]
+
+    def notices(self, environment: str, since: datetime) -> list[tuple[Notice, bool, str]]:
+        return [x for x in self.notice_log if x[0].environment == environment and x[0].at >= since]

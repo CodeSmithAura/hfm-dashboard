@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
+from hfm_dashboard.domain.notices import ComponentNoticeState, Notice
 from hfm_dashboard.domain.snapshot import NodeKey, Transition
 from hfm_dashboard.domain.status import NodeState
 
@@ -46,7 +47,21 @@ class HistoryRepository(Protocol):
     def polls(self, environment: str, since: datetime) -> list[PollRecord]:
         ...
 
+    def save_notice_states(self, environment: str, states: dict[str, ComponentNoticeState]) -> None:
+        """Replace the stored notice states of an environment (no repeat first notices after a restart)."""
+        ...
+
+    def load_notice_states(self, environment: str) -> dict[str, ComponentNoticeState]:
+        ...
+
+    def record_notices(self, notices: list[Notice], delivered: bool, note: str = "") -> None:
+        """Audit log of notices produced, and whether they were handed to delivery."""
+        ...
+
+    def notices(self, environment: str, since: datetime) -> list[tuple[Notice, bool, str]]:
+        ...
+
     def purge_before(self, cutoff: datetime) -> int:
-        """Delete poll rows and transitions older than ``cutoff``; returns rows deleted.
-        Current node states are never purged."""
+        """Delete poll rows, transitions and logged notices older than ``cutoff``; returns rows
+        deleted. Current node states and notice states are never purged."""
         ...
