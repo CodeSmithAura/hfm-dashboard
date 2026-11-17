@@ -196,8 +196,12 @@ notices:
   require_acknowledgement: false         # ASSUMED Q37
   group_downstream_under_root_cause: true   # ASSUMED Q28 - when a hard dependency is Down, one notice
   include_restart_guidance: true         # ASSUMED Q35 - start order taken from the start-up scripts
+  restart_order: [sql_server, admin_server, shared_services, ohs_load_balancer, fr_web, hfm_web, epmhfm]
+                                         # CONFIRMED Q35 - order of the 26 Oct full restart (discovery); each
+                                         # instance has its own bin\start.bat. Components not listed get no step.
   auto_restart: false                    # ASSUMED Q38 - notify only
   owners_file: owners.yaml               # filled from the owner list (Q32); kept out of the repository
+  smtp_timeout_seconds: 20               # ASSUMED A13 - connection and send timeout for the SMTP relay
 
 close_calendar:                          # ASSUMED Q46 - which days use first_notice_after_minutes_close
   business_days_before_month_end: 2

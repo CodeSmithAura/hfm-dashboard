@@ -124,8 +124,10 @@ _BASE: dict[str, Any] = {
         "require_acknowledgement": False,
         "group_downstream_under_root_cause": True,
         "include_restart_guidance": True,
+        "restart_order": ["db", "lb", "app"],
         "auto_restart": False,
         "owners_file": "owners.yaml",
+        "smtp_timeout_seconds": 20,
     },
     "close_calendar": {
         "business_days_before_month_end": 2,

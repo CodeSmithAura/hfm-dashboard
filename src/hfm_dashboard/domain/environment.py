@@ -102,7 +102,10 @@ class Sql(_Strict):
 
 class EnvironmentNotices(_Strict):
     smtp_relay: NonEmpty
+    smtp_port: Port
+    starttls: bool = True             # upgrade the relay connection to TLS (relay set-up, A13)
     from_address: NonEmpty
+    dashboard_url: str = ""           # link in notice emails once the dashboard exists
 
 
 class Environment(_Strict):

@@ -144,7 +144,21 @@ Last updated: 17 Nov 2026
     NONPROD notices are logged only (`notices_enabled: false`). Decision D28.
   - Deployment note: rules.yaml must be updated with the code (new keys are required; an outdated file
     is refused at start-up - seen in the smoke test).
-  - Branch `feature/slice12-notice-engine`; not committed yet.
+  - Committed (`9ae8493`), merged into `main` (pull request #5, `128002b`).
+- Slice 13 (17 Nov): notice emails, 642 tests passing.
+  - `domain/notice_text.py` (pure): subject, body (since / duration UTC, nodes with host and reason,
+    grouped downstream components, close-period note, restart guidance) and recipients.
+  - `config/owners.template.yaml` -> `owners.yaml` on the server (git-ignored): owners, managers (copied once
+    escalated), default, monitoring team ('cannot monitor'). Missing file: service runs, notices logged as
+    'owner list missing'. Invalid file: start refused.
+  - `adapters/smtp_mail.py` (relay, port, STARTTLS, From from `environments.yaml notices`; no login);
+    `app/notice_mailer.py` wired as the tracker's delivery. New keys: rules `notices.restart_order`
+    (CONFIRMED Q35) and `smtp_timeout_seconds` (ASSUMED A13); environments `notices.smtp_port`
+    (placeholder), `starttls`, optional `dashboard_url`.
+  - `hfm-dashboard --test-email ENV` sends one test message to the monitoring team. Decision D29.
+  - Tested with a fake SMTP object and a real smtplib session against a local test server.
+  - Real sending needs the owner list (Q32 / A04) and relay access (A13).
+  - Branch `feature/slice13-email`; not committed yet.
 
 ### Git
 - Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
@@ -154,7 +168,7 @@ Last updated: 17 Nov 2026
 - Slice 8 merged into `main` (pull request #2, `6f8ba2e`, 17 Nov).
 - Slices 9 and 10 merged into `main` (pull request #3, `cf6b3ff`, 17 Nov).
 - Each new slice branches off `main` and merges back after review (no more stacking). Commit only
-  after review. Slice 11 merged (pull request #4). Slice 12 on `feature/slice12-notice-engine`.
+  after review. Slice 12 merged (pull request #5). Slice 13 on `feature/slice13-email`.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
@@ -171,15 +185,13 @@ Last updated: 17 Nov 2026
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps (resume here)
-1. Review and commit slice 12; push and open its pull request.
+1. Review and commit slice 13; push and open its pull request.
 2. When masked outputs arrive: add them to `tests/fixtures/winrm/` (and later `weblogic/`) and run the
    parse tests against them; fix an adapter if the real output differs from the synthetic format.
-3. Remaining slices, in order: 13 email (SMTP) and owners.yaml;
-   14 dashboard (FastAPI); 15 HTTPS and AD login; 16 login probe (Playwright); 17 Windows service.
-4. Open a pull request for `feature/build1-core` to `main` when convenient.
-5. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
+3. Remaining slices, in order: 14 dashboard (FastAPI); 15 HTTPS and AD login; 16 login probe (Playwright); 17 Windows service.
+4. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
    not covered by rules.yaml yet.
-6. Tell the application team that with the current assumed weights (Q26) one HFM node down gives
+5. Tell the application team that with the current assumed weights (Q26) one HFM node down gives
    94.67% (Amber), and an Admin Server outage stays Green (96%).
 
 ## Decisions pending

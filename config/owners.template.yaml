@@ -1,0 +1,29 @@
+# HFM Availability Dashboard - component owner list TEMPLATE
+#
+# Copy to owners.yaml on the monitoring server (git-ignored, never shared) and replace the example
+# addresses with the real ones from the owner list (Q32 / A04). The file name is set in rules.yaml
+# (notices.owners_file).
+#
+# owners:   receive every notice for the component
+# managers: copied once a notice is escalated (rules.yaml escalate_to_manager_after_minutes)
+# default:  used for any enabled component not listed under components
+# monitoring_team: receives "cannot monitor" warnings (a node that could not be checked)
+#
+# Until owners.yaml exists the service still runs; notices are logged as "owner list missing".
+
+monitoring_team: ["monitoring-team@example.test"]
+
+default:
+  owners: ["epm-support@example.test"]
+  managers: ["epm-manager@example.test"]
+
+components:
+  sql_server:
+    owners: ["dba-team@example.test"]
+    managers: ["dba-manager@example.test"]
+  sql_agent:
+    owners: ["dba-team@example.test"]
+    managers: ["dba-manager@example.test"]
+  epmhfm:
+    owners: ["hfm-team@example.test"]
+    managers: ["hfm-manager@example.test"]
