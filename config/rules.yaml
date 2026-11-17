@@ -21,9 +21,11 @@ checks:
     up: [Running]
     degraded: [StartPending, StopPending, ContinuePending, PausePending, Paused]
     down: [Stopped, NotFound]
+    timeout_seconds: 20                  # ASSUMED Q40 - per-host WinRM query; must stay below poll_interval_seconds
 
   url_probe:                             # basis: ASSUMED Q23 (response times)
     timeout_seconds: 60
+    up_on_http_status: [200, 301, 302, 303, 307, 308]   # ASSUMED Q54 - any code in neither list = Degraded
     down_on_http_status: [500, 502, 503, 504]
     degraded_after_seconds:
       workspace_login: 10
@@ -31,9 +33,15 @@ checks:
       fr_web: 30
 
   weblogic_server:                       # basis: ASSUMED Q22; stuck-thread time CONFIRMED Q22
+    # Lifecycle state (serverLifeCycleRuntimes). WARNING is a health state, see health_* below.
     up: [RUNNING]
-    degraded: [WARNING, ADMIN, RESUMING, SUSPENDING]
-    down: [FAILED, SHUTDOWN, FORCE_SHUTTING_DOWN, UNKNOWN]
+    degraded: [ADMIN, RESUMING, SUSPENDING, STARTING, SHUTTING_DOWN]
+    down: [FAILED, FAILED_NOT_RESTARTABLE, SHUTDOWN, FORCE_SHUTTING_DOWN, UNKNOWN]
+    # Health state reported by a running server (serverRuntimes.healthState)   # ASSUMED Q22
+    health_up: [ok]
+    health_degraded: [warning, overloaded, critical]
+    health_down: [failed]
+    timeout_seconds: 20                  # ASSUMED Q40 - WebLogic REST request; must stay below poll_interval_seconds
     stuck_thread_max_time_seconds: 3600  # CONFIRMED Q22 - WebLogic reports a thread stuck after this
     degraded_if_stuck_threads_above: 0
     degraded_if_heap_used_pct_above: 90
@@ -154,6 +162,9 @@ scoring:
   node_points: { up: 100, degraded: 50, down: 0 }   # ASSUMED Q22
   multi_node_mode: node_share            # CONFIRMED Q27 - degraded and reduced by node share
   overall: weighted_average              # weights from criticality_weights
+  unknown_nodes: exclude                 # ASSUMED Q53 - a node whose checks cannot run is left out of the
+                                         # node share (count_as_down = score it as Down instead); a node with
+                                         # one Unknown check and no failed check is Unknown
   hard_dependency_cap_pct: 0             # ASSUMED Q28 - overall score when a hard dependency is Down
   bands:                                 # ASSUMED Q29
     green_min_pct: 95

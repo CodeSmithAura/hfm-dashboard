@@ -1,0 +1,34 @@
+{
+  "serverLifeCycleRuntimes": {"items": [
+    {"name": "AdminServer", "state": "RUNNING"},
+    {"name": "FoundationServices0", "state": "RUNNING"},
+    {"name": "FoundationServices1", "state": "RUNNING"},
+    {"name": "HFMWeb0", "state": "RUNNING"},
+    {"name": "HFMWeb1", "state": "RUNNING"},
+    {"name": "FinancialReporting0", "state": "RUNNING"},
+    {"name": "FinancialReporting1", "state": "RUNNING"}
+  ]},
+  "serverRuntimes": {"items": [
+    {"name": "AdminServer", "state": "RUNNING",
+     "healthState": {"state": "ok", "subsystemName": null, "partitionName": null, "symptoms": []},
+     "threadPoolRuntime": {"stuckThreadCount": 0}, "JVMRuntime": {"heapFreePercent": 71}},
+    {"name": "FoundationServices0", "state": "RUNNING",
+     "healthState": {"state": "ok", "subsystemName": null, "partitionName": null, "symptoms": []},
+     "threadPoolRuntime": {"stuckThreadCount": 0}, "JVMRuntime": {"heapFreePercent": 58}},
+    {"name": "FoundationServices1", "state": "RUNNING",
+     "healthState": {"state": "ok", "subsystemName": null, "partitionName": null, "symptoms": []},
+     "threadPoolRuntime": {"stuckThreadCount": 0}, "JVMRuntime": {"heapFreePercent": 62}},
+    {"name": "HFMWeb0", "state": "RUNNING",
+     "healthState": {"state": "ok", "subsystemName": null, "partitionName": null, "symptoms": []},
+     "threadPoolRuntime": {"stuckThreadCount": 0}, "JVMRuntime": {"heapFreePercent": 44}},
+    {"name": "HFMWeb1", "state": "RUNNING",
+     "healthState": {"state": "ok", "subsystemName": null, "partitionName": null, "symptoms": []},
+     "threadPoolRuntime": {"stuckThreadCount": 0}, "JVMRuntime": {"heapFreePercent": 47}},
+    {"name": "FinancialReporting0", "state": "RUNNING",
+     "healthState": {"state": "ok", "subsystemName": null, "partitionName": null, "symptoms": []},
+     "threadPoolRuntime": {"stuckThreadCount": 0}, "JVMRuntime": {"heapFreePercent": 66}},
+    {"name": "FinancialReporting1", "state": "RUNNING",
+     "healthState": {"state": "ok", "subsystemName": null, "partitionName": null, "symptoms": []},
+     "threadPoolRuntime": {"stuckThreadCount": 0}, "JVMRuntime": {"heapFreePercent": 69}}
+  ]}
+}

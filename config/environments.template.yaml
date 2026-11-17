@@ -45,6 +45,27 @@ environments:
       fr_web: "{{FR_WEB_PORT}}"                 # FinancialReporting0/1
       sql: "{{SQL_PORT}}"
 
+    winrm:                           # Windows services collector (A07, A08)
+      port: "{{WINRM_PORT}}"
+      use_ssl: false                 # HTTP listener; Negotiate/Kerberos still encrypts the payload. true for an HTTPS listener
+      auth: negotiate                # negotiate or kerberos; the service's gMSA identity is used, no password stored
+
+    weblogic:                        # WebLogic REST management API on the Admin Server (A09: read-only Monitor user)
+      admin_url: "{{WLS_ADMIN_URL}}" # scheme://host:port of the Admin Server on web node 1
+      servers:                       # WebLogic server name per node (discovered: FoundationServices0/1)
+        shared_services:
+          web_node_01: "FoundationServices0"
+          web_node_02: "FoundationServices1"
+        admin_server:
+          web_node_01: "AdminServer"
+
+    url_probes:                      # per-node probes go straight to each web node's managed server, not via OHS
+      scheme: http                   # managed servers' listen scheme (ASSUMED Q58)
+      probes:                        # probe names as in rules.yaml checks.url_probe.degraded_after_seconds
+        workspace_login: { port: foundation, path: "/workspace/" }
+        hfm_web:         { port: hfm_web,    path: "/hfmadf/" }
+        fr_web:          { port: fr_web,     path: "/hr/" }
+
     services:                        # Windows service name on each node (Q15) - all discovered 3 Nov
       ohs_load_balancer:
         web_node_01: "OHS"
@@ -117,6 +138,24 @@ environments:
       hfm_web: "{{NP_HFM_WEB_PORT}}"
       fr_web: "{{NP_FR_WEB_PORT}}"
       sql: "{{NP_SQL_PORT}}"
+
+    winrm:
+      port: "{{NP_WINRM_PORT}}"
+      use_ssl: false
+      auth: negotiate
+
+    weblogic:
+      admin_url: "{{NP_WLS_ADMIN_URL}}"
+      servers:                       # confirm the non-prod server names with discovery (Q56)
+        shared_services: { web_node_01: "FoundationServices0" }
+        admin_server:    { web_node_01: "AdminServer" }
+
+    url_probes:
+      scheme: http
+      probes:
+        workspace_login: { port: foundation, path: "/workspace/" }
+        hfm_web:         { port: hfm_web,    path: "/hfmadf/" }
+        fr_web:          { port: fr_web,     path: "/hr/" }
 
     services:                        # all discovered on the development hosts
       ohs_load_balancer: { web_node_01: "OHS" }

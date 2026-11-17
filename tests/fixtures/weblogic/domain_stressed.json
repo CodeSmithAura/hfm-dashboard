@@ -1,0 +1,20 @@
+{
+  "serverLifeCycleRuntimes": {"items": [
+    {"name": "AdminServer", "state": "RUNNING"},
+    {"name": "FoundationServices0", "state": "RUNNING"},
+    {"name": "FoundationServices1", "state": "RUNNING"}
+  ]},
+  "serverRuntimes": {"items": [
+    {"name": "AdminServer", "state": "RUNNING",
+     "healthState": {"state": "ok", "subsystemName": null, "partitionName": null, "symptoms": []},
+     "threadPoolRuntime": {"stuckThreadCount": 0}, "JVMRuntime": {"heapFreePercent": 71}},
+    {"name": "FoundationServices0", "state": "RUNNING",
+     "healthState": {"state": "warning", "subsystemName": "threadpool", "partitionName": null,
+                     "symptoms": [{"severity": "warning", "info": "2 stuck threads", "instanceId": "",
+                                   "type": "stuck-thread"}]},
+     "threadPoolRuntime": {"stuckThreadCount": 2}, "JVMRuntime": {"heapFreePercent": 5}},
+    {"name": "FoundationServices1", "state": "RUNNING",
+     "healthState": {"state": "ok", "subsystemName": null, "partitionName": null, "symptoms": []},
+     "threadPoolRuntime": {"stuckThreadCount": 0}, "JVMRuntime": {"heapFreePercent": 62}}
+  ]}
+}

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hfm-dashboard"
+version = "0.1.0"
+description = "HFM availability dashboard: status model, stability score and caution notices"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2.7",
+    "PyYAML>=6",
+    "pypsrp>=0.8",          # WinRM / PowerShell remoting (Windows services collector)
+    "httpx>=0.27",          # WebLogic REST and URL probes
+    "truststore>=0.9",      # verify TLS against the Windows certificate store (corporate CA)
+]
+
+[project.optional-dependencies]
+# Added slice by slice as adapters arrive: fastapi, apscheduler, pyodbc, playwright
+dev = ["pytest>=8"]
+
+[project.scripts]
+hfm-check-services = "hfm_dashboard.tools.check_services:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"

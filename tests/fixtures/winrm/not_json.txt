@@ -1,0 +1,1 @@
+Get-Service : Cannot open Service Control Manager on computer '.'. This operation might require other privileges.

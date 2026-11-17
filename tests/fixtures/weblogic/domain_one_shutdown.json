@@ -1,0 +1,15 @@
+{
+  "serverLifeCycleRuntimes": {"items": [
+    {"name": "AdminServer", "state": "RUNNING"},
+    {"name": "FoundationServices0", "state": "RUNNING"},
+    {"name": "FoundationServices1", "state": "SHUTDOWN"}
+  ]},
+  "serverRuntimes": {"items": [
+    {"name": "AdminServer", "state": "RUNNING",
+     "healthState": {"state": "ok", "subsystemName": null, "partitionName": null, "symptoms": []},
+     "threadPoolRuntime": {"stuckThreadCount": 0}, "JVMRuntime": {"heapFreePercent": 71}},
+    {"name": "FoundationServices0", "state": "RUNNING",
+     "healthState": {"state": "ok", "subsystemName": null, "partitionName": null, "symptoms": []},
+     "threadPoolRuntime": {"stuckThreadCount": 0}, "JVMRuntime": {"heapFreePercent": 58}}
+  ]}
+}
