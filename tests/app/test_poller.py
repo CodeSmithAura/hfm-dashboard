@@ -160,3 +160,58 @@ class TestRobustness:
         key = ("epmhfm", "hfm_node_01")
         assert second.observed_at == T0 + POLL
         assert second.node_states[key].since == first.observed_at       # Up since the first poll
+
+
+class TestHistory:
+    def test_polls_and_changes_saved(self, envs, repo_rules):
+        from hfm_dashboard.adapters.fake_history import FakeHistory
+        h = FakeHistory()
+        env = envs["PROD"]
+        p = Poller("PROD", env, repo_rules, healthy_collectors(env, repo_rules), clock=Clock(), history=h)
+        first = p.poll_once()
+        p.poll_once()
+        assert [r.overall_pct for r in h.poll_rows] == [100.0, 100.0]
+        assert len(first.transitions) == 16 and len(h.changes["PROD"]) == 16    # first sighting only
+        assert h.states["PROD"]["epmhfm", "hfm_node_01"].status is U
+
+    def test_restart_keeps_down_since_and_raises_no_new_transition(self, envs, repo_rules):
+        from hfm_dashboard.adapters.fake_history import FakeHistory
+        h = FakeHistory()
+        env = envs["PROD"]
+        c = healthy_collectors(env, repo_rules)
+        c.services.states[HFM2]["HyS9FinancialManagementJavaServer_EPMHFM2"] = "Stopped"
+        clock = Clock()
+        p1 = Poller("PROD", env, repo_rules, c, clock=clock, history=h)
+        p1.poll_once()
+        down = p1.poll_once()
+        key = ("epmhfm", "hfm_node_02")
+        assert down.node_states[key].status is D
+        down_since = down.node_states[key].since
+
+        p2 = Poller("PROD", env, repo_rules, c, clock=clock, history=h)       # service restarted
+        after = p2.poll_once()
+        assert after.node_states[key].status is D and after.node_states[key].since == down_since
+        assert after.transitions == ()                  # no spurious "went down" after restart
+        assert after.score.overall_pct == 94.67
+
+    def test_restored_states_limited_to_monitored_nodes(self, envs, repo_rules):
+        from hfm_dashboard.adapters.fake_history import FakeHistory
+        from hfm_dashboard.domain.status import NodeState
+        h = FakeHistory()
+        h.states["NONPROD"] = {("epmhfm", "hfm_node_02"): NodeState("epmhfm", "hfm_node_02", D)}
+        env = envs["NONPROD"]
+        s = Poller("NONPROD", env, repo_rules, healthy_collectors(env, repo_rules), clock=Clock(),
+                   history=h).poll_once()
+        assert ("epmhfm", "hfm_node_02") not in s.node_states
+
+    def test_history_failures_never_stop_polling(self, envs, repo_rules):
+        from hfm_dashboard.adapters.fake_history import FakeHistory
+
+        class Broken(FakeHistory):
+            def load_node_states(self, environment):
+                raise RuntimeError("disk gone")
+
+        env = envs["PROD"]
+        p = Poller("PROD", env, repo_rules, healthy_collectors(env, repo_rules), clock=Clock(),
+                   history=Broken(fail_writes=True))
+        assert p.poll_once().score.overall_pct == 100.0

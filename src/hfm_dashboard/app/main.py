@@ -2,6 +2,8 @@
 
     hfm-dashboard --config-dir config            # poll on the rules.yaml interval until stopped
     hfm-dashboard --config-dir config --once     # one poll per environment, print scores, exit
+    hfm-dashboard ... --data-dir <folder>         # where history.sqlite lives (default: data)
+    hfm-dashboard ... --once --no-history         # dry run: read nothing from and write nothing to history
 
 Until the dashboard exists, each poll is summarised in the log. Secrets come from the
 environment-variable secret store (interim, Q55). Exit codes: 0 ok, 2 configuration problem.
@@ -18,7 +20,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TextIO
 
+from datetime import UTC, datetime, timedelta
+
 from hfm_dashboard.adapters.env_secrets import EnvironmentSecretStore
+from hfm_dashboard.adapters.sqlite_history import SqliteHistory
 from hfm_dashboard.app.poller import Collectors, Poller, PollSnapshot
 from hfm_dashboard.app.scheduler import build_scheduler
 from hfm_dashboard.app.wiring import build_collectors
@@ -26,10 +31,12 @@ from hfm_dashboard.config.startup import ConfigurationError, load_configuration
 from hfm_dashboard.domain.environment import Environment
 from hfm_dashboard.domain.rules import Rules
 from hfm_dashboard.domain.status import Status
+from hfm_dashboard.ports.history import HistoryError, HistoryRepository
 
 log = logging.getLogger("hfm_dashboard")
 
 CollectorsFactory = Callable[[str, Environment, Rules], Collectors]
+HISTORY_FILE = "history.sqlite"
 
 
 def _default_factory(name: str, env: Environment, rules: Rules) -> Collectors:
@@ -61,12 +68,15 @@ def main(
     collectors_factory: CollectorsFactory = _default_factory,
     out: TextIO | None = None,
     stop: threading.Event | None = None,
+    history: HistoryRepository | None = None,
 ) -> int:
     out = out or sys.stdout
     p = argparse.ArgumentParser(prog="hfm-dashboard")
     p.add_argument("--config-dir", type=Path, default=Path("config"))
     p.add_argument("--once", action="store_true", help="poll each environment once, print, exit")
     p.add_argument("--env", action="append", help="only this environment (repeatable)")
+    p.add_argument("--data-dir", type=Path, default=Path("data"), help="folder for history.sqlite")
+    p.add_argument("--no-history", action="store_true", help="do not read or write the history store")
     args = p.parse_args(argv)
 
     try:
@@ -81,8 +91,30 @@ def main(
     if unknown:
         print(f"unknown environment(s): {', '.join(unknown)}", file=sys.stderr)
         return 2
+    if args.no_history:
+        history = None
+    elif history is None:
+        try:
+            history = SqliteHistory(args.data_dir / HISTORY_FILE)
+        except HistoryError as exc:
+            print(f"refusing to start: {exc}", file=sys.stderr)
+            return 2
+
     pollers = [Poller(n, config.environments.environments[n], rules,
-                      collectors_factory(n, config.environments.environments[n], rules)) for n in names]
+                      collectors_factory(n, config.environments.environments[n], rules), history=history)
+               for n in names]
+
+    retention = timedelta(days=rules.collection.history_retention_days)
+
+    def purge() -> None:
+        if history is None:
+            return
+        try:
+            deleted = history.purge_before(datetime.now(UTC) - retention)
+            if deleted:
+                log.info("history: purged %d row(s) older than %d days", deleted, retention.days)
+        except Exception as exc:  # noqa: BLE001 - purging must never stop monitoring
+            log.error("history: purge failed (%s)", type(exc).__name__)
 
     def report(snapshot: PollSnapshot) -> None:
         for line in summarise(snapshot):
@@ -97,7 +129,8 @@ def main(
         return 0
 
     stop = stop or threading.Event()
-    scheduler = build_scheduler(pollers, rules.collection.poll_interval_seconds, report)
+    scheduler = build_scheduler(pollers, rules.collection.poll_interval_seconds, report,
+                                purge=purge if history is not None else None)
     scheduler.start()
     log.info("polling %s every %s s", ", ".join(names), rules.collection.poll_interval_seconds)
     try:

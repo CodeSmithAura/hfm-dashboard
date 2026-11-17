@@ -20,6 +20,8 @@ def build_scheduler(
     interval_seconds: int,
     on_snapshot: Callable[[PollSnapshot], None],
     first_run: datetime | None = None,
+    purge: Callable[[], None] | None = None,
+    purge_every_hours: int = 6,
 ) -> BackgroundScheduler:
     scheduler = BackgroundScheduler(timezone=UTC)
     start = first_run or datetime.now(UTC)
@@ -39,4 +41,7 @@ def build_scheduler(
             misfire_grace_time=interval_seconds,
             next_run_time=start,
         )
+    if purge is not None:
+        scheduler.add_job(purge, IntervalTrigger(hours=purge_every_hours, timezone=UTC), id="purge-history",
+                          name="purge history", max_instances=1, coalesce=True, next_run_time=start)
     return scheduler

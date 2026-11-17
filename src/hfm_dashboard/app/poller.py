@@ -23,8 +23,17 @@ from hfm_dashboard.app.weblogic_collector import collect_weblogic
 from hfm_dashboard.domain.environment import Environment
 from hfm_dashboard.domain.rules import Rules
 from hfm_dashboard.domain.scoring import StabilityScore, score
-from hfm_dashboard.domain.snapshot import NodeKey, component_nodes, expected_checks, fold_poll, node_statuses
+from hfm_dashboard.domain.snapshot import (
+    NodeKey,
+    Transition,
+    component_nodes,
+    expected_checks,
+    fold_poll,
+    node_statuses,
+    transitions,
+)
 from hfm_dashboard.domain.status import CheckResult, NodeState
+from hfm_dashboard.ports.history import HistoryRepository, PollRecord
 from hfm_dashboard.ports.sql_health import SqlHealthSource
 from hfm_dashboard.ports.url_probe import UrlProber
 from hfm_dashboard.ports.weblogic import WeblogicSource
@@ -53,6 +62,7 @@ class PollSnapshot:
     node_states: dict[NodeKey, NodeState]
     score: StabilityScore
     collector_errors: tuple[str, ...] = field(default=())   # collectors that raised (names only)
+    transitions: tuple[Transition, ...] = field(default=())  # confirmed status changes this poll
 
 
 class Poller:
@@ -64,6 +74,7 @@ class Poller:
         collectors: Collectors,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         monotonic: Callable[[], float] = time.monotonic,
+        history: HistoryRepository | None = None,
     ) -> None:
         self.name = name
         self._env = env
@@ -73,9 +84,24 @@ class Poller:
         self._monotonic = monotonic
         self._expected = expected_checks(env, rules)
         self._scope = component_nodes(env, rules)
-        self._states: dict[NodeKey, NodeState] = {}
+        self._history = history
+        self._states: dict[NodeKey, NodeState] = self._restore()
         self._running = threading.Lock()
         self.latest: PollSnapshot | None = None
+
+    def _restore(self) -> dict[NodeKey, NodeState]:
+        """Node states from the history store, limited to nodes still monitored."""
+        if self._history is None:
+            return {}
+        try:
+            saved = self._history.load_node_states(self.name)
+        except Exception as exc:  # noqa: BLE001 - start without history rather than not at all
+            log.error("%s: could not restore node states (%s); starting fresh", self.name, type(exc).__name__)
+            return {}
+        restored = {k: v for k, v in saved.items() if k in self._expected}
+        if restored:
+            log.info("%s: restored %d node state(s) from history", self.name, len(restored))
+        return restored
 
     def poll_once(self) -> PollSnapshot | None:
         """Run one poll; returns None (and logs) if a poll for this environment is still running."""
@@ -117,7 +143,9 @@ class Poller:
             else:
                 results += out                  # type: ignore[arg-type]
 
-        self._states = fold_poll(self._states, results, self._expected, rules, observed_at)
+        previous = self._states
+        self._states = fold_poll(previous, results, self._expected, rules, observed_at)
+        changes = transitions(previous, self._states, observed_at)
         snapshot = PollSnapshot(
             environment=self.name,
             observed_at=observed_at,
@@ -127,6 +155,18 @@ class Poller:
             node_states=dict(self._states),
             score=score(node_statuses(self._states), rules, self._scope),
             collector_errors=tuple(errors),
+            transitions=tuple(changes),
         )
         self.latest = snapshot
+        self._save(snapshot)
         return snapshot
+
+    def _save(self, s: PollSnapshot) -> None:
+        if self._history is None:
+            return
+        record = PollRecord(s.environment, s.observed_at, s.score.overall_pct, s.score.uncapped_pct,
+                            s.score.band.value, s.score.capped_by, s.duration_seconds, s.collector_errors)
+        try:
+            self._history.save_poll(record, s.node_states, list(s.transitions))
+        except Exception as exc:  # noqa: BLE001 - history must never stop monitoring
+            log.error("%s: could not save history (%s)", self.name, type(exc).__name__)

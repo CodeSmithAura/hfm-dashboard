@@ -100,3 +100,21 @@ class TestScoringScope:
         scope = component_nodes(envs["NONPROD"], repo_rules)
         with pytest.raises(ValueError, match="unknown nodes"):
             score({"epmhfm": {"hfm_node_02": U}}, repo_rules, scope)
+
+
+class TestTransitions:
+    def test_first_sighting_and_changes_only(self, envs, repo_rules):
+        from hfm_dashboard.domain.snapshot import transitions
+        exp = expected_checks(envs["PROD"], repo_rules)
+        s1 = fold_poll({}, all_up(exp, T0), exp, repo_rules, T0)
+        first = transitions({}, s1, T0)
+        assert len(first) == 16 and all(t.before is None and t.after is U for t in first)
+        s2 = fold_poll(s1, all_up(exp, T0 + POLL), exp, repo_rules, T0 + POLL)
+        assert transitions(s1, s2, T0 + POLL) == []
+        stopped = {("epmhfm", "hfm_node_02", "windows_service"): D}
+        s3 = fold_poll(s2, all_up(exp, T0 + 2 * POLL, stopped), exp, repo_rules, T0 + 2 * POLL)
+        assert transitions(s2, s3, T0 + 2 * POLL) == []            # not confirmed yet: no change
+        s4 = fold_poll(s3, all_up(exp, T0 + 3 * POLL, stopped), exp, repo_rules, T0 + 3 * POLL)
+        (t,) = transitions(s3, s4, T0 + 3 * POLL)
+        assert (t.component, t.node, t.before, t.after, t.at) == ("epmhfm", "hfm_node_02", U, D, T0 + 3 * POLL)
+        assert "windows_service: down" in t.detail

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from datetime import datetime
 
 from hfm_dashboard.domain.environment import Environment
@@ -75,3 +76,28 @@ def node_statuses(states: Mapping[NodeKey, NodeState]) -> dict[str, dict[str, St
     for (cid, node), state in states.items():
         out[cid][node] = state.status
     return dict(out)
+
+
+@dataclass(frozen=True, slots=True)
+class Transition:
+    """A confirmed status change of one node (``before`` is None the first time a node is seen)."""
+
+    component: str
+    node: str
+    before: Status | None
+    after: Status
+    at: datetime          # UTC: the poll at which the new status was confirmed
+    detail: str = ""
+
+
+def transitions(previous: Mapping[NodeKey, NodeState], current: Mapping[NodeKey, NodeState],
+                at: datetime) -> list[Transition]:
+    """Confirmed status changes between two consecutive polls, in node order."""
+    out = []
+    for key in sorted(current):
+        before = previous.get(key)
+        after = current[key]
+        if before is None or before.status is not after.status:
+            out.append(Transition(key[0], key[1], before.status if before else None, after.status, at,
+                                  after.detail))
+    return out

@@ -67,7 +67,8 @@ class TestScheduler:
 
 
 @pytest.fixture
-def config_dir(tmp_path):
+def config_dir(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)          # any default data/ folder lands in the temp dir, never the repo
     (tmp_path / "rules.yaml").write_text(RULES_PATH.read_text(encoding="utf-8"), encoding="utf-8")
     (tmp_path / "environments.yaml").write_text(FILLED, encoding="utf-8")
     return tmp_path
@@ -95,7 +96,8 @@ class TestMain:
         main(["--config-dir", str(config_dir), "--once", "--env", "PROD"], collectors_factory=factory, out=out)
         assert "sql_server/db_node_01: UNKNOWN - check could not run: SQL Server not reachable" in out.getvalue()
 
-    def test_config_problem_refuses_to_start(self, tmp_path):
+    def test_config_problem_refuses_to_start(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         (tmp_path / "rules.yaml").write_text(RULES_PATH.read_text(encoding="utf-8"), encoding="utf-8")
         assert main(["--config-dir", str(tmp_path), "--once"], collectors_factory=fake_factory) == 2
 
@@ -129,3 +131,56 @@ def test_library_loggers_quietened():
     quiet_libraries()
     assert all(logging.getLogger(n).level == logging.WARNING for n in NOISY_LOGGERS)
     assert {"pypsrp", "httpx"} <= set(NOISY_LOGGERS)
+
+
+class TestHistoryOptions:
+    def test_default_history_file_in_data_dir(self, config_dir):
+        from hfm_dashboard.adapters.sqlite_history import SqliteHistory
+        main(["--config-dir", str(config_dir), "--once", "--env", "PROD", "--data-dir", "hist"],
+             collectors_factory=fake_factory, out=io.StringIO())
+        main(["--config-dir", str(config_dir), "--once", "--env", "PROD", "--data-dir", "hist"],
+             collectors_factory=fake_factory, out=io.StringIO())
+        h = SqliteHistory(config_dir / "hist" / "history.sqlite")
+        assert len(h.polls("PROD", T0.replace(year=2000))) == 2
+        assert len(h.load_node_states("PROD")) == 16
+        h.close()
+
+    def test_no_history_writes_nothing(self, config_dir):
+        main(["--config-dir", str(config_dir), "--once", "--no-history"], collectors_factory=fake_factory,
+             out=io.StringIO())
+        assert not (config_dir / "data").exists()
+
+    def test_unopenable_history_refuses_to_start(self, config_dir):
+        (config_dir / "blocked").write_text("a file, not a folder")
+        assert main(["--config-dir", str(config_dir), "--once", "--data-dir", "blocked"],
+                    collectors_factory=fake_factory, out=io.StringIO()) == 2
+
+    def test_purge_job_scheduled(self, prod, repo_rules):
+        pollers = [Poller("PROD", prod, repo_rules, healthy_collectors(prod, repo_rules))]
+        sched = build_scheduler(pollers, 60, lambda s: None, purge=lambda: None)
+        job = sched.get_job("purge-history")
+        assert job is not None and job.trigger.interval.total_seconds() == 6 * 3600
+        assert build_scheduler(pollers, 60, lambda s: None).get_job("purge-history") is None
+
+
+def test_purge_uses_history_retention_days(config_dir):
+    from hfm_dashboard.adapters.fake_history import FakeHistory
+
+    cutoffs, stop = [], threading.Event()
+
+    class Recording(FakeHistory):
+        def purge_before(self, cutoff):
+            cutoffs.append(cutoff)
+            stop.set()
+            return super().purge_before(cutoff)
+
+    timer = threading.Timer(10, stop.set)
+    timer.start()
+    try:
+        main(["--config-dir", str(config_dir), "--env", "PROD"], collectors_factory=fake_factory,
+             out=io.StringIO(), stop=stop, history=Recording())
+    finally:
+        timer.cancel()
+    assert cutoffs, "purge job did not run at start-up"
+    age = datetime.now(UTC) - cutoffs[0]
+    assert abs(age.total_seconds() - 90 * 86400) < 60        # rules.yaml history_retention_days: 90

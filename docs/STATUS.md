@@ -106,7 +106,20 @@ Last updated: 17 Nov 2026
   - Tests pin the numbers for the application team: one HFM node down 94.67% Amber, Admin Server down
     96% Green, SQL Server down capped 0% Red. Decision D24.
   - Smoke-tested with real adapters against invented hosts: every check Unknown with its reason.
-  - Branch `feature/slice9-poll-loop`; not committed yet.
+  - Committed (`2deddbb`) on `feature/slice9-poll-loop`; pull request opened 17 Nov.
+- Slice 10 (17 Nov): status history, 487 tests passing.
+  - Port `ports/history.py`; adapter `adapters/sqlite_history.py` (SQLite, WAL, atomic write per poll,
+    schema version check); fake `adapters/fake_history.py`.
+  - Poll rows, current node states and confirmed status changes (`domain/snapshot.transitions`, also
+    carried in each snapshot for the notice engine). States restored at start-up: "down since" and flap
+    counters survive restarts, no spurious transitions. Purge every 6 h after `history_retention_days`.
+  - `hfm-dashboard --data-dir <folder>` (default `data/`) and `--no-history`. Decision D25.
+  - Smoke-tested: two real runs, states restored, rows written.
+  - Open design point: a URL probe that cannot connect counts as Down (D17), while WinRM / WebLogic /
+    SQL connection failures count as Unknown. If the monitoring server loses its network path to a web
+    node, web components show Down (and later trigger notices). Decide whether "connection failed"
+    (as opposed to refused / HTTP 5xx / timeout) should be Unknown.
+  - Branch `feature/slice10-history` (stacked on slice 9 until it is merged); not committed yet.
 
 ### Git
 - Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
@@ -115,7 +128,8 @@ Last updated: 17 Nov 2026
 - Slices 1-7 merged into `main` (pull request #1, merge commit `960f6b2`, 17 Nov).
 - Slice 8 merged into `main` (pull request #2, `6f8ba2e`, 17 Nov).
 - Each new slice branches off `main` and merges back after review (no more stacking). Commit only
-  after review. Slice 9 on `feature/slice9-poll-loop`.
+  after review. Slice 9 on `feature/slice9-poll-loop` (pull request open); slice 10 on
+  `feature/slice10-history`, branched from slice 9.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
@@ -130,12 +144,12 @@ Last updated: 17 Nov 2026
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps (resume here)
-1. Review and commit slice 9; push and open a pull request to `main`.
+1. Merge slice 9; review and commit slice 10; push and open its pull request.
 2. When masked outputs arrive: add them to `tests/fixtures/winrm/` (and later `weblogic/`) and run the
    parse tests against them; fix an adapter if the real output differs from the synthetic format.
-3. Next slices: status history in SQLite behind a repository port (node states survive restarts,
-   90-day retention); notice engine (state machine per component, close calendar, maintenance);
-   dashboard (FastAPI); Windows service wrapper.
+3. Remaining slices, in order: 11 disk space and event log checks (WinRM); 12 notice engine (pure state
+   machine, close calendar, maintenance, root-cause grouping); 13 email (SMTP) and owners.yaml;
+   14 dashboard (FastAPI); 15 HTTPS and AD login; 16 login probe (Playwright); 17 Windows service.
 4. Open a pull request for `feature/build1-core` to `main` when convenient.
 5. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
    not covered by rules.yaml yet.
