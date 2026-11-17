@@ -89,11 +89,13 @@ class WinRMServiceSource:
         timeout_seconds: int,
         credential: Credential | None = None,
         client_factory: Callable[..., Any] = _default_client_factory,
+        on_output: Callable[[str, str], None] | None = None,
     ) -> None:
         self._settings = settings
         self._timeout = timeout_seconds
         self._credential = credential
         self._client_factory = client_factory
+        self._on_output = on_output   # (host, raw script output) - used to record sample responses
 
     def _client_kwargs(self) -> dict[str, Any]:
         kwargs: dict[str, Any] = {
@@ -121,6 +123,8 @@ class WinRMServiceSource:
             raise
         except Exception as exc:  # noqa: BLE001 - every transport failure means "cannot check"
             raise ServiceQueryError(_describe(exc)) from exc
+        if self._on_output is not None:
+            self._on_output(host, output)
         if had_errors:
             raise ServiceQueryError("service query reported an error on the host")
         return parse_output(service_names, output)

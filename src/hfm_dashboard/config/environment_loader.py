@@ -45,10 +45,27 @@ def find_placeholders(data: Any, path: str = "") -> list[str]:
     return found
 
 
-def parse_environments(text: str, rules: Rules, source: str = "environments.yaml") -> EnvironmentsConfig:
+def parse_environments(
+    text: str,
+    rules: Rules,
+    source: str = "environments.yaml",
+    only_environment: str | None = None,
+) -> EnvironmentsConfig:
+    """Validate the whole file, or with ``only_environment`` just that environment's block.
+
+    ``only_environment`` exists for command-line diagnostics run where only one environment is
+    filled in; the monitoring service itself always validates the whole file (hard rule 6).
+    """
     data = load_mapping(text, source, EnvironmentConfigError)
 
-    unfilled = find_placeholders(data)
+    if only_environment is None:
+        unfilled = find_placeholders(data)
+    else:
+        envs = data.get("environments")
+        if not isinstance(envs, dict) or only_environment not in envs:
+            raise EnvironmentConfigError(f"{source}: environment {only_environment!r} not found")
+        data = {**data, "environments": {only_environment: envs[only_environment]}}
+        unfilled = find_placeholders(data["environments"], "environments")
     if unfilled:
         raise EnvironmentConfigError(
             f"{source}: {len(unfilled)} placeholder(s) not filled in - replace them with the real "
@@ -69,7 +86,9 @@ def parse_environments(text: str, rules: Rules, source: str = "environments.yaml
     return config
 
 
-def load_environments(path: str | Path, rules: Rules) -> EnvironmentsConfig:
+def load_environments(
+    path: str | Path, rules: Rules, only_environment: str | None = None
+) -> EnvironmentsConfig:
     path = Path(path)
     try:
         text = path.read_text(encoding="utf-8")
@@ -78,4 +97,4 @@ def load_environments(path: str | Path, rules: Rules) -> EnvironmentsConfig:
             f"cannot read {path.name}: {exc.strerror} "
             f"(copy environments.template.yaml to {path.name} and fill it in)"
         ) from exc
-    return parse_environments(text, rules, source=path.name)
+    return parse_environments(text, rules, source=path.name, only_environment=only_environment)

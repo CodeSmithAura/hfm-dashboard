@@ -109,6 +109,24 @@ class TestPlaceholders:
 
 # --------------------------------------------------------------------------- loader basics
 
+class TestOnlyEnvironment:
+    def test_other_environments_and_monitoring_may_keep_placeholders(self, repo_rules):
+        data = yaml.safe_load(TEMPLATE)
+        data["environments"]["NONPROD"] = yaml.safe_load(FILLED)["environments"]["NONPROD"]
+        cfg = parse_environments(yaml.safe_dump(data), repo_rules, only_environment="NONPROD")
+        assert list(cfg.environments) == ["NONPROD"]
+
+    def test_whole_file_still_refused_without_option(self, repo_rules):
+        data = yaml.safe_load(TEMPLATE)
+        data["environments"]["NONPROD"] = yaml.safe_load(FILLED)["environments"]["NONPROD"]
+        with pytest.raises(EnvironmentConfigError, match="not filled in"):
+            parse_environments(yaml.safe_dump(data), repo_rules)
+
+    def test_missing_environment(self, repo_rules):
+        with pytest.raises(EnvironmentConfigError, match="'UAT' not found"):
+            parse_environments(FILLED, repo_rules, only_environment="UAT")
+
+
 class TestLoader:
     def test_missing_file_hints_at_template(self, tmp_path, repo_rules):
         with pytest.raises(EnvironmentConfigError, match="environments.template.yaml"):

@@ -4,7 +4,9 @@ JSON exactly as returned by the `Get-Service` script in
 `src/hfm_dashboard/adapters/winrm_services.py` (`ConvertTo-Json -Compress`).
 
 **Synthetic for now**: written in the script's output format before monitoring access existed
-(A06-A08). Replace with masked recordings from the development servers once access is granted.
+(A06-A08). Replace with masked recordings from the development servers once access is granted:
+run `hfm-check-services --env NONPROD --record <dir>` (see the README), review the files, then copy
+them here and point the parse tests at them.
 Service names are the ones already in `config/environments.template.yaml`; no host names,
 addresses or accounts appear in these files.
 

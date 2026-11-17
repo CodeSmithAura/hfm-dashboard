@@ -1,6 +1,6 @@
 # Status (update as things change)
 
-Last updated: 10 Nov 2026
+Last updated: 17 Nov 2026
 
 ## Plan
 - Target go-live: 30 Nov 2026 (production), with shadow mode from 26 Nov.
@@ -50,30 +50,37 @@ Last updated: 10 Nov 2026
   - Not run against a real server yet (needs A06-A08, or permitted development access).
   - Committed (`dec29de`).
 
+- Slice 5 (17 Nov): operator command `hfm-check-services`, 322 tests passing.
+  - `tools/check_services.py`: runs the services collector for one environment, prints component /
+    node / status / reason (node keys, not hosts); exit 0 all Up, 1 not Up, 2 config problem.
+  - `--record DIR`: masked raw responses per node plus a summary (`tools/masking.py`: hosts, short
+    names, DNS suffixes, user name, IPv4); nothing written if anything real remains.
+  - `--username` prompts for the password; refused for PROD (D11). Only the chosen environment's block
+    of environments.yaml must be filled in (`only_environment` loader option). Decision D20.
+  - Smoke-tested with the real pypsrp adapter against invented hosts: clean Unknown results, no crash.
+  - Branch `feature/slice5-service-check` (from `feature/build1-core`); not committed yet.
+
 ### Git
-- Slices 1-4 are on branch `feature/build1-core` (renamed from `feature/slice1-status-scoring`),
-  4 commits on top of `main`. Not yet pushed: the first push needs an interactive GitHub sign-in
-  on this workstation (`git push -u origin feature/build1-core`).
-- From slice 5 on: one branch per slice, started from `feature/build1-core`; commit only after review.
+- Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
+- Slice 5 on `feature/slice5-service-check`. One branch per slice; commit only after review.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
-- Masked sample outputs: being gathered in the client environment (this workstation has no server
-  access). Run the read-only `Get-Service` script from `adapters/winrm_services.py` on a development
-  node with the NONPROD service names; mask host and account names; save the JSON under
-  `tests/fixtures/winrm/` to replace the synthetic samples.
+- Waiting for server access (A06-A08, or permitted development access in the client environment).
+  Then run `hfm-check-services --env NONPROD --record <dir>` there, review the masked files and bring
+  them back for `tests/fixtures/winrm/`.
 - Q53 (how Unknown nodes are scored) and Q54 (healthy HTTP codes) waiting for the application team.
 - Dev environment note: on this workstation Python 3.12 and git are not on PATH in new shells; use
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps (resume here)
-1. Push `feature/build1-core` (after sign-in) and open a pull request to `main`.
+1. Review and commit slice 5.
 2. When masked outputs arrive: add them to `tests/fixtures/winrm/` and parse tests against them; fix
    the adapter if the real output differs from the synthetic format.
-3. Slice 5: small command-line check to run the services collector against the development servers
-   (where permitted) and record masked sample responses. Can be built and tested without access.
-4. Next collectors, each with a fake and samples: WebLogic REST (state, stuck threads, heap), URL probes
-   (httpx), SQL Server DMVs (pyodbc); then the poll loop wiring collectors -> node state -> scoring.
+3. Next collectors, each on its own branch with a fake and samples: WebLogic REST (state, stuck
+   threads, heap), URL probes (httpx), SQL Server DMVs (pyodbc); then the poll loop wiring
+   collectors -> node state -> scoring.
+4. Open a pull request for `feature/build1-core` to `main` when convenient.
 5. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
    not covered by rules.yaml yet.
 6. Tell the application team that with the current assumed weights (Q26) one HFM node down gives

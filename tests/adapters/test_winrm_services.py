@@ -162,6 +162,14 @@ class TestWinRMSource:
         assert factory.calls[0][1]["password"] == "s3cret-value"
         assert "s3cret-value" not in repr(cred)
 
+    def test_on_output_receives_raw_text_even_when_unparseable(self):
+        seen = []
+        src = WinRMServiceSource(SETTINGS, 20, client_factory=Factory(FakeClient(sample("not_json.txt"))),
+                                 on_output=lambda h, t: seen.append((h, t)))
+        with pytest.raises(ServiceQueryError):
+            src.query("h", ["OHS"])
+        assert seen == [("h", sample("not_json.txt"))]
+
     def test_empty_request_makes_no_connection(self):
         factory = Factory(FakeClient())
         assert WinRMServiceSource(SETTINGS, 20, client_factory=factory).query("h", []) == {}

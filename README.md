@@ -18,7 +18,24 @@ py -3.12 -m venv .venv
 .venv\Scripts\python -m pytest
 ```
 
+## Checking Windows services by hand (read-only)
+
+Needs `config/rules.yaml` and a `config/environments.yaml` in which at least the chosen
+environment's block is filled in. Output shows node keys, not host names.
+
+```
+.venv\Scripts\hfm-check-services --env NONPROD
+.venv\Scripts\hfm-check-services --env NONPROD --record recordings
+.venv\Scripts\hfm-check-services --env NONPROD --username DOMAIN\dev.user   # dev testing only (D11); not for PROD
+```
+
+`--record DIR` writes each host's raw response plus a summary, with host names, DNS suffixes, the
+user name and IP addresses masked; nothing is written if anything real is left. Review the files,
+then copy them to `tests/fixtures/winrm/`. Exit code: 0 all Up, 1 something not Up, 2 config problem.
+
+## Layout
+
 Layout: `src/hfm_dashboard/domain` (status model, rules and environment models, check evaluation,
 scoring - no I/O), `config/` (YAML loading, start-up gate), `ports/` (interfaces to external
-systems), `adapters/` (WinRM, ... and their fakes), `app/` (collectors). Tests mirror it under
+systems), `adapters/` (WinRM, ... and their fakes), `app/` (collectors), `tools/` (operator commands). Tests mirror it under
 `tests/`; masked sample responses live in `tests/fixtures/`.

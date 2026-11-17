@@ -17,6 +17,9 @@ dependencies = [
 # Added slice by slice as adapters arrive: fastapi, apscheduler, httpx, pyodbc, playwright
 dev = ["pytest>=8"]
 
+[project.scripts]
+hfm-check-services = "hfm_dashboard.tools.check_services:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
