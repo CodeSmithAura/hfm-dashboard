@@ -66,8 +66,10 @@ class WeblogicObservation:
 class SqlServerObservation:
     """SQL Server health from the service state and DMVs / msdb.
 
-    Failure lists hold the age in hours of each failure the collector found; an empty tuple means
-    none were found, ``None`` means the collector could not read them.
+    ``agent_job_failures_hours_ago`` holds the age in hours of each failed job run found (empty
+    tuple: none). ``hours_since_last_backup`` maps each monitored database to the hours since its
+    last successful full or differential backup (``None`` value: never backed up). A field that is
+    ``None`` as a whole could not be read.
     """
 
     service_running: bool | None
@@ -76,7 +78,7 @@ class SqlServerObservation:
     max_log_used_pct: float | None = None
     tempdb_used_pct: float | None = None
     disk_free_pct: dict[str, float] | None = None       # drive/volume label -> % free
-    backup_failures_hours_ago: tuple[float, ...] | None = None
+    hours_since_last_backup: dict[str, float | None] | None = None
     agent_job_failures_hours_ago: tuple[float, ...] | None = None
     longest_query_minutes: float | None = None
 
@@ -235,7 +237,15 @@ def _sql_server(obs: SqlServerObservation, checks: Checks) -> Evaluation:
         if count:
             findings.append((Status.DEGRADED, f"{count} failed {what}(s) in last {window:g} h"))
 
-    recent(obs.backup_failures_hours_ago, rule.degraded_if_backup_failed_in_last_hours, "backup")
+    window = rule.degraded_if_no_backup_in_last_hours
+    if obs.hours_since_last_backup is None:
+        findings.append((Status.UNKNOWN, "backup history not read"))
+    else:
+        for db, age in sorted(obs.hours_since_last_backup.items()):
+            if age is None:
+                findings.append((Status.DEGRADED, f"{db} never backed up"))
+            elif age > window:
+                findings.append((Status.DEGRADED, f"{db} last backup {age:.0f} h ago > {window:g} h"))
     recent(obs.agent_job_failures_hours_ago, rule.degraded_if_agent_job_failed_in_last_hours,
            "Agent job")
 

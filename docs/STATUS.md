@@ -84,14 +84,25 @@ Last updated: 17 Nov 2026
     not start overlapping polls, or the timeout should be lowered.
   - Committed (`a5f5fef`) on `feature/slice7-url-probes`.
 
+- Slice 8 (17 Nov): SQL Server collector, 438 tests passing.
+  - Port `ports/sql_health.py`; adapter `adapters/sql_health.py` (pyodbc, ODBC Driver 18, eight
+    read-only SELECTs on DMVs and msdb; Windows auth via gMSA by default, SQL login optional); fake
+    `adapters/fake_sql.py`; collector `app/sql_collector.py`.
+  - Backup rule changed to `degraded_if_no_backup_in_last_hours` (msdb records only successful
+    backups; ASSUMED Q59). New `checks.sql_server.timeout_seconds` (ASSUMED Q40). `sql:` block in the
+    environment template. Decision D23.
+  - Synthetic query samples in `tests/fixtures/sql/`; `production_disks.json` reproduces Q52 (C: 8.6%
+    free -> Degraded). Not run against a real instance yet (A10); the monitoring server needs
+    ODBC Driver 18 installed.
+  - Not committed yet.
+
 ### Git
 - Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
 - Slices 1-7 are a straight line of commits: `feature/build1-core` (1-4) -> `feature/slice5-service-check`
   -> `feature/slice6-weblogic` -> `feature/slice7-url-probes`, all pushed (17 Nov).
-- Pull request `feature/slice7-url-probes` -> `main` (all seven slices) being opened 17 Nov; merge with
-  a merge commit so every slice commit stays visible.
-- After the merge: each new slice branches off `main` and merges back after review (no more stacking).
-  Commit only after review.
+- Slices 1-7 merged into `main` (pull request #1, merge commit `960f6b2`, 17 Nov).
+- Each new slice branches off `main` and merges back after review (no more stacking). Commit only
+  after review. Slice 8 on `feature/slice8-sql-server`.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
@@ -101,16 +112,16 @@ Last updated: 17 Nov 2026
 - Q53 (how Unknown nodes are scored) and Q54 (healthy HTTP codes) waiting for the application team.
 - Q55 (production secret store) open with infrastructure / security; Q56 (non-prod WebLogic names) assumed.
 - Q57 (how a load-balancer probe failure counts) open with the application team, high priority;
-  Q58 (managed-server scheme for direct probes) assumed.
+  Q58 (managed-server scheme for direct probes) assumed. Q59 (backup check / schedule) assumed.
 - Dev environment note: on this workstation Python 3.12 and git are not on PATH in new shells; use
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps (resume here)
-1. Merge the slices 1-7 pull request into `main`; start slice 8 from the updated `main`.
+1. Review and commit slice 8; push and open a pull request to `main`.
 2. When masked outputs arrive: add them to `tests/fixtures/winrm/` (and later `weblogic/`) and run the
    parse tests against them; fix an adapter if the real output differs from the synthetic format.
-3. Next: SQL Server collector (pyodbc, DMVs and msdb) on its own branch with a fake and samples; then
-   the poll loop wiring collectors -> node state -> scoring (no overlapping polls, see slice 7).
+3. Next: the poll loop wiring all collectors -> node state (flap protection) -> scoring, with no
+   overlapping polls (see slice 7); then status history (SQLite), notices and the dashboard.
 4. Open a pull request for `feature/build1-core` to `main` when convenient.
 5. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
    not covered by rules.yaml yet.

@@ -31,7 +31,7 @@ def healthy_sql(**overrides) -> SqlServerObservation:
         max_log_used_pct=20,
         tempdb_used_pct=10,
         disk_free_pct={"C:": 40, "D:": 50},
-        backup_failures_hours_ago=(),
+        hours_since_last_backup={"HFM": 3.0, "HSS": 3.0},
         agent_job_failures_hours_ago=(),
         longest_query_minutes=1,
     )
@@ -282,7 +282,7 @@ class TestSqlServer:
 
     @pytest.mark.parametrize("field", [
         "longest_blocking_minutes", "deadlocks_last_15_min", "max_log_used_pct", "tempdb_used_pct",
-        "longest_query_minutes", "disk_free_pct", "backup_failures_hours_ago",
+        "longest_query_minutes", "disk_free_pct", "hours_since_last_backup",
         "agent_job_failures_hours_ago",
     ])
     def test_metric_not_read_is_unknown(self, rules, field):
@@ -301,17 +301,27 @@ class TestSqlServer:
         assert ev.status is D
         assert "C:" in ev.detail and "D:" in ev.detail
 
-    @pytest.mark.parametrize("field", ["backup_failures_hours_ago", "agent_job_failures_hours_ago"])
+    @pytest.mark.parametrize("field", ["agent_job_failures_hours_ago"])
     def test_failure_window(self, rules, field):
         assert self.ev(rules, healthy_sql(**{field: (25.0, 48.0)})).status is U
         ev = self.ev(rules, healthy_sql(**{field: (24.0, 30.0)}))
         assert ev.status is G
         assert "1 failed" in ev.detail
 
-    def test_window_read_from_rules(self, rules_dict):
-        rules_dict["checks"]["sql_server"]["degraded_if_backup_failed_in_last_hours"] = 48
+    def test_backup_age(self, rules):
+        assert self.ev(rules, healthy_sql(hours_since_last_backup={"HFM": 24.0})).status is U
+        ev = self.ev(rules, healthy_sql(hours_since_last_backup={"HFM": 30.0, "HSS": 2.0}))
+        assert ev.status is G
+        assert ev.detail == "HFM last backup 30 h ago > 24 h"
+
+    def test_never_backed_up(self, rules):
+        ev = self.ev(rules, healthy_sql(hours_since_last_backup={"EPMRCU": None}))
+        assert ev.status is G and "EPMRCU never backed up" in ev.detail
+
+    def test_backup_window_read_from_rules(self, rules_dict):
+        rules_dict["checks"]["sql_server"]["degraded_if_no_backup_in_last_hours"] = 48
         r = Rules.model_validate(rules_dict)
-        assert self.ev(r, healthy_sql(backup_failures_hours_ago=(30.0,))).status is G
+        assert self.ev(r, healthy_sql(hours_since_last_backup={"HFM": 30.0})).status is U
 
     def test_several_problems_all_listed(self, rules):
         ev = self.ev(rules, healthy_sql(max_log_used_pct=95, longest_blocking_minutes=12))

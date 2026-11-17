@@ -1,0 +1,10 @@
+{
+  "blocking": null,
+  "deadlocks": null,
+  "log_used": null,
+  "tempdb": [[1048576, 917504]],
+  "disk": null,
+  "backups": [["HSS", 6.5], ["HFM", 6.4], ["EPMRCU", 6.6]],
+  "agent_failures": [],
+  "longest_query": null
+}

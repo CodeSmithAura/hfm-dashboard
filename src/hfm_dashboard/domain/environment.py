@@ -91,6 +91,15 @@ class UrlProbes(_Strict):
     probes: dict[str, UrlProbeTarget]   # probe name (rules.yaml degraded_after_seconds) -> target
 
 
+class Sql(_Strict):
+    """How the monitoring server connects to SQL Server (read-only health queries)."""
+
+    port: NonEmpty                       # key into ``ports``
+    auth: Literal["windows", "sql"]      # windows: the service's gMSA; sql: login from secrets
+    encrypt: bool = True
+    trust_server_certificate: bool = False
+
+
 class EnvironmentNotices(_Strict):
     smtp_relay: NonEmpty
     from_address: NonEmpty
@@ -106,6 +115,7 @@ class Environment(_Strict):
     winrm: WinRM
     weblogic: Weblogic
     url_probes: UrlProbes
+    sql: Sql
     services: dict[str, dict[str, NonEmpty]]   # component -> node -> Windows service name
     databases: list[NonEmpty]
     notices: EnvironmentNotices
@@ -198,6 +208,11 @@ def check_against_rules(config: EnvironmentsConfig, rules: Rules) -> list[str]:
             if target.port not in env.ports:
                 problems.append(f"{where}.url_probes.probes.{probe}.port: {target.port!r} is not a key "
                                 f"in ports")
+
+        if env.sql.port not in env.ports:
+            problems.append(f"{where}.sql.port: {env.sql.port!r} is not a key in ports")
+        if env.sql.auth == "sql" and "sql_monitor_login" not in env.secrets:
+            problems.append(f"{where}.sql.auth: 'sql' needs secrets.sql_monitor_login")
 
         for node in env.nodes:
             if node not in used_nodes:

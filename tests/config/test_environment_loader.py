@@ -246,6 +246,16 @@ class TestAgainstRules:
         assert env.node_probe_url("hfm_web", "web_node_02") == "http://web-node-02.example.test:8443/hfmadf/"
         assert env.lb_probe_url("workspace_login") == "https://lb.example.test/workspace/"
 
+    def test_sql_port_must_be_a_ports_key(self, env_data, repo_rules):
+        env_data["environments"]["PROD"]["sql"]["port"] = "mssql"
+        assert problems(env_data, repo_rules) == ["environments.PROD.sql.port: 'mssql' is not a key in ports"]
+
+    def test_sql_auth_needs_secret_name(self, env_data, repo_rules):
+        env_data["environments"]["PROD"]["sql"]["auth"] = "sql"
+        assert problems(env_data, repo_rules) == []          # template has secrets.sql_monitor_login
+        del env_data["environments"]["PROD"]["secrets"]["sql_monitor_login"]
+        assert problems(env_data, repo_rules) == ["environments.PROD.sql.auth: 'sql' needs secrets.sql_monitor_login"]
+
     def test_service_for_unknown_component(self, env_data, repo_rules):
         env_data["environments"]["PROD"]["services"]["essbase"] = {"web_node_01": "Essbase"}
         assert problems(env_data, repo_rules) == [
