@@ -16,6 +16,7 @@ def env_with(hosts: dict[str, str]) -> Environment:
         "ports": {},
         "winrm": {"port": 1234, "use_ssl": False, "auth": "negotiate"},
         "weblogic": {"admin_url": "https://wlsadm.client-corp.invalid:1234", "servers": {}},
+        "url_probes": {"scheme": "http", "probes": {}},
         "services": {},
         "databases": [],
         "notices": {"smtp_relay": "relay.client-corp.invalid", "from_address": "a@client-corp.invalid"},

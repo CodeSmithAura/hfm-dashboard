@@ -221,6 +221,31 @@ class TestAgainstRules:
         with pytest.raises(EnvironmentConfigError, match="weblogic.admin_url"):
             parse_environments(yaml.safe_dump(env_data), repo_rules)
 
+    def test_missing_probe_target(self, env_data, repo_rules):
+        del env_data["environments"]["PROD"]["url_probes"]["probes"]["fr_web"]
+        assert problems(env_data, repo_rules) == ["environments.PROD.url_probes.probes: no target for probe fr_web"]
+
+    def test_unknown_probe_name(self, env_data, repo_rules):
+        env_data["environments"]["PROD"]["url_probes"]["probes"]["essbase"] = {"port": "sql", "path": "/x/"}
+        found = problems(env_data, repo_rules)
+        assert len(found) == 1 and "url_probes.probes.essbase: not a probe in rules.yaml" in found[0]
+
+    def test_probe_port_must_be_a_ports_key(self, env_data, repo_rules):
+        env_data["environments"]["PROD"]["url_probes"]["probes"]["hfm_web"]["port"] = "hfmweb"
+        assert problems(env_data, repo_rules) == [
+            "environments.PROD.url_probes.probes.hfm_web.port: 'hfmweb' is not a key in ports"
+        ]
+
+    def test_probe_path_must_be_absolute(self, env_data, repo_rules):
+        env_data["environments"]["PROD"]["url_probes"]["probes"]["hfm_web"]["path"] = "hfmadf/"
+        with pytest.raises(EnvironmentConfigError, match="url_probes.probes.hfm_web.path"):
+            parse_environments(yaml.safe_dump(env_data), repo_rules)
+
+    def test_probe_urls(self, repo_rules):
+        env = parse_environments(FILLED, repo_rules).environments["PROD"]
+        assert env.node_probe_url("hfm_web", "web_node_02") == "http://web-node-02.example.test:8443/hfmadf/"
+        assert env.lb_probe_url("workspace_login") == "https://lb.example.test/workspace/"
+
     def test_service_for_unknown_component(self, env_data, repo_rules):
         env_data["environments"]["PROD"]["services"]["essbase"] = {"web_node_01": "Essbase"}
         assert problems(env_data, repo_rules) == [

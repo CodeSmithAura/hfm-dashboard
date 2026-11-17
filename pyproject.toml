@@ -11,7 +11,8 @@ dependencies = [
     "pydantic>=2.7",
     "PyYAML>=6",
     "pypsrp>=0.8",          # WinRM / PowerShell remoting (Windows services collector)
-    "httpx>=0.27",          # WebLogic REST (and later URL probes)
+    "httpx>=0.27",          # WebLogic REST and URL probes
+    "truststore>=0.9",      # verify TLS against the Windows certificate store (corporate CA)
 ]
 
 [project.optional-dependencies]

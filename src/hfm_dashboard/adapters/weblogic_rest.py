@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 
+from hfm_dashboard.adapters.tls import verify_setting
 from hfm_dashboard.domain.evaluation import WeblogicObservation
 from hfm_dashboard.ports.secrets import Secret
 from hfm_dashboard.ports.weblogic import WeblogicQueryError
@@ -56,7 +57,7 @@ class WeblogicRestSource:
                 base_url=self._admin_url,
                 auth=(self._credential.username, self._credential.password),
                 timeout=self._timeout,
-                verify=self._verify,
+                verify=verify_setting(self._verify),
                 transport=self._transport,
                 headers={"Accept": "application/json", "X-Requested-By": "hfm-dashboard"},
             ) as client:

@@ -70,6 +70,27 @@ class Weblogic(_Strict):
         return url.rstrip("/")
 
 
+class UrlProbeTarget(_Strict):
+    port: NonEmpty    # key into ``ports`` (e.g. foundation, hfm_web, fr_web)
+    path: NonEmpty
+
+    @field_validator("path")
+    @classmethod
+    def _absolute(cls, path: str) -> str:
+        if not path.startswith("/"):
+            raise ValueError("path must start with /")
+        return path
+
+
+class UrlProbes(_Strict):
+    """Per-node probes go straight to each web node's managed server (OHS would balance across
+    both nodes and hide which one failed). Load balancer probes use ``load_balancer.url`` + path."""
+
+    scheme: Literal["http", "https"]
+    cert_validation: bool = True
+    probes: dict[str, UrlProbeTarget]   # probe name (rules.yaml degraded_after_seconds) -> target
+
+
 class EnvironmentNotices(_Strict):
     smtp_relay: NonEmpty
     from_address: NonEmpty
@@ -84,6 +105,7 @@ class Environment(_Strict):
     ports: dict[str, Port]
     winrm: WinRM
     weblogic: Weblogic
+    url_probes: UrlProbes
     services: dict[str, dict[str, NonEmpty]]   # component -> node -> Windows service name
     databases: list[NonEmpty]
     notices: EnvironmentNotices
@@ -100,6 +122,13 @@ class Environment(_Strict):
     def weblogic_server(self, component_id: str, node: str) -> str:
         """WebLogic server name of a component on a node (e.g. a managed server per web node)."""
         return self.weblogic.servers[component_id][node]
+
+    def node_probe_url(self, probe: str, node: str) -> str:
+        target = self.url_probes.probes[probe]
+        return f"{self.url_probes.scheme}://{self.nodes[node].host}:{self.ports[target.port]}{target.path}"
+
+    def lb_probe_url(self, probe: str) -> str:
+        return f"{self.load_balancer.url}{self.url_probes.probes[probe].path}"
 
     def names_for(self, check_kind: str) -> tuple[str, dict[str, dict[str, str]]]:
         """(config path, component -> node -> name) for checks that need a name per node."""
@@ -155,6 +184,20 @@ def check_against_rules(config: EnvironmentsConfig, rules: Rules) -> list[str]:
                 for node in present:
                     if node not in names:
                         problems.append(f"{where}.{path}.{cid}: no {_LABEL[kind]} for node {node}")
+
+        known_probes = rules.checks.url_probe.degraded_after_seconds
+        used_probes = {ref.partition(":")[2] for comp in enabled.values() for ref in comp.checks
+                       if ref.startswith("url_probe:")}
+        for probe in sorted(used_probes):
+            if probe not in env.url_probes.probes:
+                problems.append(f"{where}.url_probes.probes: no target for probe {probe}")
+        for probe, target in env.url_probes.probes.items():
+            if probe not in known_probes:
+                problems.append(f"{where}.url_probes.probes.{probe}: not a probe in rules.yaml "
+                                f"{sorted(known_probes)}")
+            if target.port not in env.ports:
+                problems.append(f"{where}.url_probes.probes.{probe}.port: {target.port!r} is not a key "
+                                f"in ports")
 
         for node in env.nodes:
             if node not in used_nodes:

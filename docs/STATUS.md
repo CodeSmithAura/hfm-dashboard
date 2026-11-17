@@ -70,12 +70,24 @@ Last updated: 17 Nov 2026
   - Secret store port `ports/secrets.py`; interim adapter reads environment variables
     (`adapters/env_secrets.py`) until Q55 is decided. Queries Q55, Q56 added. Decision D21.
   - Synthetic REST samples in `tests/fixtures/weblogic/`; not run against a real Admin Server yet (A09).
-  - Branch `feature/slice6-weblogic` (stacked on slice 5); not committed yet.
+  - Committed (`0573d48`) on `feature/slice6-weblogic`.
+- Slice 7 (17 Nov): URL probe collector, 404 tests passing.
+  - Port `ports/url_probe.py`; adapter `adapters/http_probe.py` (httpx GET, no credentials, redirects
+    not followed, timed); fake `adapters/fake_probe.py`; collector `app/probe_collector.py`.
+  - Per-node probes straight to each web node's managed-server port (`url_probes` block in the
+    environment template; scheme ASSUMED Q58). Load-balancer probes reported separately under node
+    `load_balancer`, kept out of scoring until Q57 is answered. Decision D22.
+  - TLS verified against the Windows certificate store (`adapters/tls.py`, truststore), now also used
+    by the WebLogic adapter.
+  - Open point for the poll loop: `checks.url_probe.timeout_seconds` (60) equals
+    `collection.poll_interval_seconds` (60), so a hanging probe can last a whole poll; the loop must
+    not start overlapping polls, or the timeout should be lowered.
+  - Branch `feature/slice7-url-probes` (stacked on slice 6); not committed yet.
 
 ### Git
 - Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
-- Slice 5 on `feature/slice5-service-check`, slice 6 on `feature/slice6-weblogic` (stacked on slice 5).
-  One branch per slice; commit only after review. Slices 5-6 not pushed yet.
+- Slices 5, 6, 7 on `feature/slice5-service-check`, `feature/slice6-weblogic`, `feature/slice7-url-probes`,
+  each stacked on the previous. Slices 5-6 pushed (17 Nov). One branch per slice; commit only after review.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
@@ -84,16 +96,17 @@ Last updated: 17 Nov 2026
   them back for `tests/fixtures/winrm/`.
 - Q53 (how Unknown nodes are scored) and Q54 (healthy HTTP codes) waiting for the application team.
 - Q55 (production secret store) open with infrastructure / security; Q56 (non-prod WebLogic names) assumed.
+- Q57 (how a load-balancer probe failure counts) open with the application team, high priority;
+  Q58 (managed-server scheme for direct probes) assumed.
 - Dev environment note: on this workstation Python 3.12 and git are not on PATH in new shells; use
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
 ### Next steps (resume here)
-1. Review and commit slice 6; push slices 5-6.
+1. Review and commit slice 7; push it.
 2. When masked outputs arrive: add them to `tests/fixtures/winrm/` (and later `weblogic/`) and run the
    parse tests against them; fix an adapter if the real output differs from the synthetic format.
-3. Next collectors, each on its own branch with a fake and samples: URL probes (httpx, per node and
-   through the load balancer), SQL Server DMVs (pyodbc); then the poll loop wiring
-   collectors -> node state -> scoring.
+3. Next: SQL Server collector (pyodbc, DMVs and msdb) on its own branch with a fake and samples; then
+   the poll loop wiring collectors -> node state -> scoring (no overlapping polls, see slice 7).
 4. Open a pull request for `feature/build1-core` to `main` when convenient.
 5. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
    not covered by rules.yaml yet.

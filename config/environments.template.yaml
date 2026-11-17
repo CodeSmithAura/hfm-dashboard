@@ -59,6 +59,13 @@ environments:
         admin_server:
           web_node_01: "AdminServer"
 
+    url_probes:                      # per-node probes go straight to each web node's managed server, not via OHS
+      scheme: http                   # managed servers' listen scheme (ASSUMED Q58)
+      probes:                        # probe names as in rules.yaml checks.url_probe.degraded_after_seconds
+        workspace_login: { port: foundation, path: "/workspace/" }
+        hfm_web:         { port: hfm_web,    path: "/hfmadf/" }
+        fr_web:          { port: fr_web,     path: "/hr/" }
+
     services:                        # Windows service name on each node (Q15) - all discovered 3 Nov
       ohs_load_balancer:
         web_node_01: "OHS"
@@ -142,6 +149,13 @@ environments:
       servers:                       # confirm the non-prod server names with discovery (Q56)
         shared_services: { web_node_01: "FoundationServices0" }
         admin_server:    { web_node_01: "AdminServer" }
+
+    url_probes:
+      scheme: http
+      probes:
+        workspace_login: { port: foundation, path: "/workspace/" }
+        hfm_web:         { port: hfm_web,    path: "/hfmadf/" }
+        fr_web:          { port: fr_web,     path: "/hr/" }
 
     services:                        # all discovered on the development hosts
       ohs_load_balancer: { web_node_01: "OHS" }
