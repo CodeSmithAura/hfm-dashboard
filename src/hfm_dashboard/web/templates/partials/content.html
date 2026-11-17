@@ -1,0 +1,156 @@
+{# Refreshable content. Only prints the view model (docs/ui.md); no calculations here. #}
+{% for b in view.banners %}
+<div class="banner banner-{{ b.kind }}" role="status">{{ b.text }}</div>
+{% endfor %}
+
+<section class="kpis" aria-label="Summary">
+  <div class="panel kpi-score">
+    <svg class="gauge band-{{ view.score.band }}" viewBox="0 0 120 120" role="img" aria-label="Stability score {{ view.score.pct_text }}">
+      <circle class="gauge-track" cx="60" cy="60" r="50" pathLength="100"></circle>
+      <circle class="gauge-fill" cx="60" cy="60" r="50" pathLength="100" stroke-dasharray="{{ view.score.pct or 0 }} 100" transform="rotate(-90 60 60)"></circle>
+    </svg>
+    <div>
+      <div class="kpi-label">Stability score</div>
+      <div class="big h">{{ view.score.pct_text }}</div>
+      <span class="chip band-{{ view.score.band }}">{{ view.score.band_label }}</span>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="kpi-label">Components</div>
+    <div class="big h">{{ view.counts.total }}</div>
+    <div class="legend">
+      <span class="chip s-up">{{ view.counts.up }} up</span>
+      <span class="chip s-degraded">{{ view.counts.degraded }} degraded</span>
+      <span class="chip s-down">{{ view.counts.down }} down</span>
+      <span class="chip s-unknown">{{ view.counts.unknown }} unknown</span>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="kpi-label">Notices today</div>
+    <div class="big h">{{ view.notices | length }}</div>
+    <div class="muted small">{% if view.notices_enabled %}Emailed to component owners{% else %}Logged only in this environment{% endif %}</div>
+  </div>
+  <div class="panel">
+    <div class="kpi-label">Through the load balancer</div>
+    <div class="big h">{{ view.load_balancer | length }} probes</div>
+    <div class="muted small">{{ view.lb_note }}</div>
+  </div>
+</section>
+
+<div class="split">
+  <div class="left">
+    <section class="panel" aria-label="Component and node status">
+      <div class="panel-head">
+        <h2 class="h">Components × nodes</h2>
+        <span class="muted small">Select a cell for its checks</span>
+      </div>
+      <div class="gridbox">
+        <div class="grid nodes-{{ view.nodes | length }}">
+          <div class="gh first">Component</div>
+          {% for n in view.nodes %}<div class="gh">{{ n.label }}</div>{% endfor %}
+          {% for row in view.rows %}
+          <div class="rowname"><b>{{ row.name }}</b><span>{{ row.meta }}</span></div>
+          {% for cell in row.cells %}
+          {% if cell.applicable %}
+          <a class="cell s-{{ cell.status }}{% if cell.selected %} sel{% endif %}" href="?sel={{ cell.select }}" aria-label="{{ cell.aria }}"{% if cell.selected %} aria-current="true"{% endif %}>
+            <span class="icon icon-{{ cell.status }}" aria-hidden="true"></span><span class="cell-label">{{ cell.label }}</span>
+          </a>
+          {% else %}
+          <div class="na" aria-hidden="true"></div>
+          {% endif %}
+          {% endfor %}
+          {% endfor %}
+        </div>
+      </div>
+      <div class="legend muted">
+        <span class="chip s-up">Up</span><span class="chip s-degraded">Degraded</span><span class="chip s-down">Down</span>
+        <span class="chip s-unknown">Unknown (cannot check)</span><span class="chip s-maintenance">Maintenance</span>
+        <span class="small">Hatched: component does not run on that node</span>
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Selected cell">
+      {% if view.selected %}
+      <div class="panel-head">
+        <div>
+          <div class="kpi-label">{{ view.selected.node_label }} · {{ view.selected.host }}</div>
+          <h2 class="h">{{ view.selected.name }}</h2>
+        </div>
+        <span class="chip s-{{ view.selected.status }}">{{ view.selected.status_label }}</span>
+      </div>
+      {% if view.selected.since %}<p class="muted small">{{ view.selected.since_text }}</p>{% endif %}
+      {% for c in view.selected.checks %}
+      <div class="check">
+        <div><b>{{ c.label }}</b><div class="muted small">{{ c.detail }}</div></div>
+        <span class="chip s-{{ c.status }}">{{ c.status_label }}</span>
+      </div>
+      {% endfor %}
+      {% else %}
+      <h2 class="h">Details</h2>
+      <p class="muted small">Select a cell in the grid to see the checks behind it.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel" aria-label="Component scores">
+      <h2 class="h">Component scores</h2>
+      <div class="list">
+        {% for cs in view.component_scores %}
+        <div class="score-row">
+          <div class="score-name"><span>{{ cs.name }}</span><span class="muted">×{{ cs.weight }}</span></div>
+          <div class="score-pct">{{ cs.pct_text }}</div>
+          <meter class="bar s-{{ cs.status }}" min="0" max="100" value="{{ cs.pct or 0 }}" aria-label="{{ cs.name }} {{ cs.pct_text }}"></meter>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <div class="right">
+    <section class="panel" aria-label="Needs attention">
+      <h2 class="h">Needs attention</h2>
+      {% if not view.attention %}
+      <div class="item"><span class="chip s-up">All clear</span><span class="muted">Every monitored component is up.</span></div>
+      {% endif %}
+      <div class="list">
+        {% for a in view.attention %}
+        <div class="item">
+          <span class="chip s-{{ a.status }}">{{ a.status_label }}</span>
+          <div>
+            <b>{{ a.name }} · {{ a.node_label }}</b>
+            <div class="muted small">{{ a.detail }}</div>
+            {% if a.since %}<div class="muted small">since <time datetime="{{ a.since }}" data-local>{{ a.since }}</time> ({{ a.duration_text }})</div>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Notices">
+      <h2 class="h">Notices today</h2>
+      {% if not view.notices %}<p class="muted small">No notices today.</p>{% endif %}
+      <div class="list">
+        {% for n in view.notices %}
+        <div class="notice">
+          <time class="muted small" datetime="{{ n.at }}" data-local data-time-only>{{ n.at }}</time>
+          <div>
+            <span class="chip s-{{ n.tone }}">{{ n.kind_label }}</span>
+            <div class="small">{{ n.text }}</div>
+            <div class="muted small">{{ n.delivery }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel" aria-label="Load balancer probes">
+      <h2 class="h">Load balancer probes</h2>
+      <p class="muted small">{{ view.lb_note }}</p>
+      {% for p in view.load_balancer %}
+      <div class="check">
+        <div><b>{{ p.name }}</b><div class="muted small">{{ p.path }} · {{ p.detail }}</div></div>
+        <span class="chip s-{{ p.status }}">{{ p.status_label }}</span>
+      </div>
+      {% endfor %}
+    </section>
+  </div>
+</div>

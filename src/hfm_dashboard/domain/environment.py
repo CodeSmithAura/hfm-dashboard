@@ -158,11 +158,13 @@ NAMED_CHECKS = ("windows_service", "weblogic_server")
 
 class Monitoring(_Strict):
     monitor_host: NonEmpty
+    dashboard_bind: NonEmpty     # interface the dashboard listens on (host name or address)
+    dashboard_port: Port
 
 
 class EnvironmentsConfig(_Strict):
     environments: dict[str, Environment] = Field(min_length=1)
-    monitoring: Monitoring
+    monitoring: Monitoring | None = None   # required for the service; not needed to check one environment
 
 
 def check_against_rules(config: EnvironmentsConfig, rules: Rules) -> list[str]:

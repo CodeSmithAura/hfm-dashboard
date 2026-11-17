@@ -1,0 +1,29 @@
+/* Theme tokens. Re-skin the dashboard by overriding this file (docs/ui.md): every colour, font and
+   radius the layout uses comes from these variables. Dark is the default ("control room"). */
+
+:root {
+  --font-body: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-head: "Space Grotesk", "Segoe UI Semibold", Inter, system-ui, sans-serif;
+  --radius: 14px;
+  --radius-sm: 9px;
+
+  --bg: #0b111c; --panel: #121a28; --chip: #1b2536; --line: #243146;
+  --text: #e6edf7; --muted: #97a6bd; --accent: #38bdf8; --accent-ink: #04131f; --accent-soft: rgba(56, 189, 248, .14);
+
+  --up: #5eead4;      --up-bg: rgba(45, 212, 191, .13);
+  --degraded: #fbbf24; --degraded-bg: rgba(251, 191, 36, .14);
+  --down: #fb7185;    --down-bg: rgba(251, 113, 133, .15);
+  --unknown: #b4c0d3; --unknown-bg: rgba(148, 163, 184, .16);
+  --maintenance: #c4b5fd; --maintenance-bg: rgba(167, 139, 250, .16);
+}
+
+:root[data-theme="light"] {
+  --bg: #f3f6fa; --panel: #ffffff; --chip: #eef2f7; --line: #dfe5ee;
+  --text: #0f1b2d; --muted: #536179; --accent: #0284c7; --accent-ink: #ffffff; --accent-soft: rgba(2, 132, 199, .10);
+
+  --up: #0f766e;      --up-bg: #dff5f1;
+  --degraded: #a35b00; --degraded-bg: #fff1d6;
+  --down: #be123c;    --down-bg: #ffe2e7;
+  --unknown: #475569; --unknown-bg: #e8edf3;
+  --maintenance: #6d28d9; --maintenance-bg: #efe8ff;
+}

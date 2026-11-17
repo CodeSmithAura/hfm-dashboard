@@ -120,7 +120,7 @@ class TestMain:
         timer = threading.Timer(10, stop.set)     # safety net
         timer.start()
         try:
-            code = main(["--config-dir", str(config_dir)], collectors_factory=fake_factory, out=out, stop=stop)
+            code = main(["--config-dir", str(config_dir), "--no-web"], collectors_factory=fake_factory, out=out, stop=stop)
         finally:
             timer.cancel()
         assert code == 0 and "PROD: 100.00% GREEN" in out.getvalue()
@@ -179,10 +179,54 @@ def test_purge_uses_history_retention_days(config_dir):
     timer = threading.Timer(10, stop.set)
     timer.start()
     try:
-        main(["--config-dir", str(config_dir), "--env", "PROD"], collectors_factory=fake_factory,
+        main(["--config-dir", str(config_dir), "--env", "PROD", "--no-web"], collectors_factory=fake_factory,
              out=io.StringIO(), stop=stop, history=Recording())
     finally:
         timer.cancel()
     assert cutoffs, "purge job did not run at start-up"
     age = datetime.now(UTC) - cutoffs[0]
     assert abs(age.total_seconds() - 90 * 86400) < 60        # rules.yaml history_retention_days: 90
+
+
+def test_service_serves_dashboard_while_polling(config_dir):
+    """Real uvicorn on localhost: the running service answers the API and the page, then stops."""
+    import socket
+    import time
+
+    import httpx
+    import yaml
+
+    s = socket.socket()
+    s.bind(("localhost", 0))
+    port = s.getsockname()[1]
+    s.close()
+    data = yaml.safe_load((config_dir / "environments.yaml").read_text(encoding="utf-8"))
+    data["monitoring"]["dashboard_bind"] = "localhost"
+    data["monitoring"]["dashboard_port"] = port
+    (config_dir / "environments.yaml").write_text(yaml.safe_dump(data), encoding="utf-8")
+
+    stop = threading.Event()
+    result = {}
+    t = threading.Thread(target=lambda: result.setdefault("code", main(
+        ["--config-dir", str(config_dir), "--no-history", "--env", "PROD"],
+        collectors_factory=fake_factory, out=io.StringIO(), stop=stop)))
+    t.start()
+    try:
+        deadline = time.monotonic() + 15
+        api = None
+        while time.monotonic() < deadline:
+            try:
+                api = httpx.get(f"http://localhost:{port}/api/v1/environments/PROD/dashboard", timeout=2)
+                if api.status_code == 200 and api.json()["observed_at"]:
+                    break
+            except httpx.HTTPError:
+                pass
+            time.sleep(0.2)
+        assert api is not None and api.status_code == 200
+        assert api.json()["score"]["pct_text"] == "100.00%"
+        page = httpx.get(f"http://localhost:{port}/env/PROD", timeout=2)
+        assert page.status_code == 200 and "Content-Security-Policy" in page.headers
+    finally:
+        stop.set()
+        t.join(20)
+    assert result.get("code") == 0

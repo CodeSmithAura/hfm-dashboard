@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ view.environment_name }} · HFM Availability{% endblock %}
+{% block body %}
+<div class="dash">
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 12 7 12 10 4 14 20 17 12 21 12"></polyline></svg>
+      </div>
+      <div>
+        <div class="h title">HFM Availability</div>
+        <div class="muted small">Updated <time datetime="{{ view.observed_at }}" data-local>{{ view.observed_at or "-" }}</time> · polls every {{ view.poll_interval_seconds }} s</div>
+      </div>
+    </div>
+    <div class="actions">
+      <nav class="tabs" aria-label="Environment">
+        {% for tab in view.environments %}
+        <a class="tab{% if tab.active %} on{% endif %}" href="/env/{{ tab.id }}"{% if tab.active %} aria-current="page"{% endif %}>{{ tab.name }}</a>
+        {% endfor %}
+      </nav>
+      <button class="iconbtn" type="button" data-theme-toggle aria-label="Switch light or dark theme">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="content" data-refresh-seconds="{{ view.poll_interval_seconds }}" aria-live="polite">
+    {% include "partials/content.html" %}
+  </main>
+
+  <footer class="muted small footer">
+    <span>Times shown in your local time · weights and bands from rules.yaml</span>
+    <span>{{ view.environment_name }}{% if not view.notices_enabled %} · dashboard only{% endif %}</span>
+  </footer>
+</div>
+</div>
+{% endblock %}

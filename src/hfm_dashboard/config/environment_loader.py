@@ -64,7 +64,7 @@ def parse_environments(
         envs = data.get("environments")
         if not isinstance(envs, dict) or only_environment not in envs:
             raise EnvironmentConfigError(f"{source}: environment {only_environment!r} not found")
-        data = {**data, "environments": {only_environment: envs[only_environment]}}
+        data = {**data, "environments": {only_environment: envs[only_environment]}, "monitoring": None}
         unfilled = find_placeholders(data["environments"], "environments")
     if unfilled:
         raise EnvironmentConfigError(
@@ -78,6 +78,8 @@ def parse_environments(
         raise EnvironmentConfigError(format_validation_error(exc, source)) from exc
 
     problems = check_against_rules(config, rules)
+    if only_environment is None and config.monitoring is None:
+        problems.insert(0, "monitoring: section missing (monitor_host, dashboard_bind, dashboard_port)")
     if problems:
         raise EnvironmentConfigError(
             f"{source}: {len(problems)} problem(s) against rules.yaml\n"
