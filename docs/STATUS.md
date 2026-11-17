@@ -1,12 +1,13 @@
 # Status (update as things change)
 
-Last updated: 17 Nov 2026
+Last updated: 17 Nov 2026 (end of day)
 
 ## Plan
 - Target go-live: 30 Nov 2026 (production), with shadow mode from 26 Nov.
 - Live schedule with forecast dates: `docs/delivery_plan.xlsx` (dates recalculate from actuals).
-- Current phase: Build 1, data collectors (planned 2-6 Nov). Forecast slips while design sign-off
-  (A12) and access (A06-A11) are open.
+- Build: slices 1-14 done and merged (collectors, poll loop, history, notices, email, dashboard).
+  Remaining: 17 Windows service (next), interim maintenance file, 16 login probe, 15 HTTPS + login.
+- Nothing has run against a real server yet: access A06-A11 still open; design sign-off A12 open.
 
 ## Build progress
 
@@ -172,17 +173,13 @@ Last updated: 17 Nov 2026
   - Runs in the service (uvicorn thread); `monitoring.dashboard_bind` / `dashboard_port` placeholders in
     the environment template; `--no-web`. Read-only: maintenance entry comes with login (slice 15).
   - Tested end to end with a real uvicorn server on localhost while polling. Decision D30.
-  - Branch `feature/slice14-dashboard`; not committed yet.
+  - Committed (`6013024`), merged into `main` (pull request #7, `c60ca9f`).
 
 ### Git
-- Slices 1-4 on `feature/build1-core`, pushed to origin (17 Nov). No pull request yet.
-- Slices 1-7 are a straight line of commits: `feature/build1-core` (1-4) -> `feature/slice5-service-check`
-  -> `feature/slice6-weblogic` -> `feature/slice7-url-probes`, all pushed (17 Nov).
-- Slices 1-7 merged into `main` (pull request #1, merge commit `960f6b2`, 17 Nov).
-- Slice 8 merged into `main` (pull request #2, `6f8ba2e`, 17 Nov).
-- Slices 9 and 10 merged into `main` (pull request #3, `cf6b3ff`, 17 Nov).
-- Each new slice branches off `main` and merges back after review (no more stacking). Commit only
-  after review. Slice 13 merged (pull request #6). Slice 14 on `feature/slice14-dashboard`.
+- All slices 1-14 are in `main` (latest merge: pull request #7, `c60ca9f`, 17 Nov). Merges use merge
+  commits so each slice commit stays visible.
+- Each new slice branches off `main` and merges back after review. Commit only after review.
+- No GitHub CLI on this workstation: pull requests are opened from a pre-filled compare link.
 
 ### In progress
 - Build 1 (data collectors), planned 2-6 Nov (running late).
@@ -198,15 +195,41 @@ Last updated: 17 Nov 2026
 - Dev environment note: on this workstation Python 3.12 and git are not on PATH in new shells; use
   `.venv\Scripts\python` and the full git path, or fix PATH / turn off the Store python alias.
 
+### Slice 15 deferred (decided 17 Nov)
+HTTPS, Windows/AD login (viewer/admin groups) and the maintenance-window entry form wait until their
+inputs exist: AD group names, a TLS certificate for the dashboard, confirmation the monitoring server
+is domain-joined. Consequences and mitigations until then:
+- The dashboard is plain HTTP without login (read-only, but shows status and host names). Set
+  `monitoring.dashboard_bind: localhost`, or allow only trusted admin machines in the firewall.
+  HTTPS + Windows login is a stated requirement: needed before go-live on 30 Nov, or accepted
+  explicitly as a shadow-mode-only gap.
+- Maintenance windows cannot be entered, so planned work would email owners as an outage.
+  Mitigation: interim git-ignored `maintenance.yaml` read by the existing `MaintenanceCalendar` port
+  (small slice, before shadow mode).
+
 ### Next steps (resume here)
-1. Review and commit slice 14; push and open its pull request.
-2. When masked outputs arrive: add them to `tests/fixtures/winrm/` (and later `weblogic/`) and run the
-   parse tests against them; fix an adapter if the real output differs from the synthetic format.
-3. Remaining slices, in order: 15 HTTPS, Windows/AD login (viewer/admin) and maintenance-window entry; 16 login probe (Playwright); 17 Windows service.
-4. Login probe (later slice): decide how a failed login step (page loads, login rejected) is scored;
-   not covered by rules.yaml yet.
-5. Tell the application team that with the current assumed weights (Q26) one HFM node down gives
-   94.67% (Amber), and an Admin Server outage stays Green (96%).
+1. Slice 17: Windows service packaging - install/uninstall as a service, auto-start, restart on failure,
+   log files with rotation (UTC), service account = read-only gMSA (A07), install runbook. Needed for
+   shadow mode on 26 Nov.
+2. Interim maintenance windows from a git-ignored `maintenance.yaml` (as part of 17 or right after).
+3. When masked outputs arrive: add them to `tests/fixtures/` (winrm, weblogic, sql) and run the parse
+   tests against them; fix an adapter if the real output differs from the synthetic format.
+4. Slice 16: login probe (Playwright) once the test user exists (A11 / Q20); decide first how a failed
+   login step (page loads, login rejected) is scored - not covered by rules.yaml yet.
+5. Slice 15: HTTPS, AD login, maintenance form - when its inputs arrive (see above).
+6. Tell the application team: with the assumed weights (Q26) one HFM node down = 94.67% Amber, Admin
+   Server down = 96% Green; today's production disk levels (Q52) start the score at 88% Amber.
+7. Chase high-priority answers: Q57 (load-balancer probe scoring), Q61 (notice rules, esp. whether one
+   node down emails owners), Q32 (owner list), A13 (SMTP relay).
+
+### Server inputs to fill on the monitoring server (cumulative)
+- `environments.yaml` from the template: hosts, ports, `winrm`, `weblogic` (admin URL), `url_probes`,
+  `sql`, `notices` (relay, port, from), `monitoring` (monitor host, dashboard bind and port).
+- `owners.yaml` from `owners.template.yaml` once the owner list exists (Q32).
+- Secrets as environment variables until Q55 (e.g. `HFM_MON_PROD_WEBLOGIC_USERNAME` / `_PASSWORD`).
+- Monitoring account: WinRM read access and Event Log Readers on every server (A07), WebLogic Monitor
+  role (A09), SQL VIEW SERVER STATE + msdb read (A10). ODBC Driver 18 on the monitoring server.
+- Always deploy `config/rules.yaml` together with the code (new keys are required at start-up).
 
 ## Decisions pending
 - A12: application team to confirm architecture option A (direct polling) in writing.
