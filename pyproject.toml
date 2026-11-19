@@ -18,6 +18,7 @@ dependencies = [
     "fastapi>=0.110",       # dashboard web app and JSON API
     "uvicorn>=0.29",        # dashboard web server
     "jinja2>=3.1",          # dashboard templates (replaceable, see docs/ui.md)
+    "pywin32>=306; sys_platform == 'win32'",  # Windows service host and installer (slice 17)
 ]
 
 [project.optional-dependencies]
@@ -27,6 +28,7 @@ dev = ["pytest>=8"]
 [project.scripts]
 hfm-check-services = "hfm_dashboard.tools.check_services:main"
 hfm-dashboard = "hfm_dashboard.app.main:run"
+hfm-service = "hfm_dashboard.tools.service_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

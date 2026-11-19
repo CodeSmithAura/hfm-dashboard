@@ -1,12 +1,13 @@
 # Status (update as things change)
 
-Last updated: 17 Nov 2026 (end of day)
+Last updated: 19 Nov 2026
 
 ## Plan
 - Target go-live: 30 Nov 2026 (production), with shadow mode from 26 Nov.
 - Live schedule with forecast dates: `docs/delivery_plan.xlsx` (dates recalculate from actuals).
-- Build: slices 1-14 done and merged (collectors, poll loop, history, notices, email, dashboard).
-  Remaining: 17 Windows service (next), interim maintenance file, 16 login probe, 15 HTTPS + login.
+- Build: slices 1-14 done and merged (collectors, poll loop, history, notices, email, dashboard);
+  slice 17 (Windows service) built 19 Nov, awaiting review.
+  Remaining: interim maintenance file (next), 16 login probe, 15 HTTPS + login.
 - Nothing has run against a real server yet: access A06-A11 still open; design sign-off A12 open.
 
 ## Build progress
@@ -175,6 +176,27 @@ Last updated: 17 Nov 2026 (end of day)
   - Tested end to end with a real uvicorn server on localhost while polling. Decision D30.
   - Committed (`6013024`), merged into `main` (pull request #7, `c60ca9f`).
 
+- Slice 17 (19 Nov): Windows service packaging, 742 tests passing.
+  - Service `HfmAvailabilityMonitor` hosted with pywin32 (`adapters/windows_service.py`); body in
+    `app/service_host.py` (runs the normal monitor loop with a stop event, testable without Windows'
+    service manager). Registered command = base Python `-I -S service_boot.py <venv site-packages>
+    <absolute folders>`, because a venv's python.exe is only a launcher (child process).
+  - Requested stop = clean (running poll may finish within `stop_timeout_seconds`); start-up refused
+    (configuration) = stopped with an error, not restarted; crash = Windows recovery restarts it.
+    A dashboard that cannot bind its port now ends the monitor (exit 1) instead of polling without it.
+  - Logs: `app/logs.py`, `<log-dir>/hfm-dashboard.log`, UTC timestamps, rotated 00:00 UTC; poll
+    summaries go to the log; start / stop / failures also to the Application event log.
+  - Operator command `hfm-service check | install | status | uninstall` (`tools/service_cli.py`,
+    port `ports/service_control.py`, fake for tests): install refuses unless configuration is valid and
+    the exact command line passes `--check`; sets automatic delayed start, gMSA account, recovery
+    actions (`sc.exe failure`), event log source.
+  - New rules block `monitor_service` (restart delays 60/120/300 s, reset 24 h, stop timeout 90 s, logs
+    kept 30 days; ASSUMED Q62). Decision D31. Runbook `docs/service_install.md`.
+  - Verified here: the registered command line in `--check` mode (base interpreter, isolated) loads the
+    venv, pywin32 and configuration; the service body runs and stops the real loop. NOT yet verified:
+    an actual install / start / stop through the service manager (needs an elevated prompt).
+  - Committed on branch `feature/slice17-windows-service`; pull request to open.
+
 ### Git
 - All slices 1-14 are in `main` (latest merge: pull request #7, `c60ca9f`, 17 Nov). Merges use merge
   commits so each slice commit stays visible.
@@ -208,10 +230,9 @@ is domain-joined. Consequences and mitigations until then:
   (small slice, before shadow mode).
 
 ### Next steps (resume here)
-1. Slice 17: Windows service packaging - install/uninstall as a service, auto-start, restart on failure,
-   log files with rotation (UTC), service account = read-only gMSA (A07), install runbook. Needed for
-   shadow mode on 26 Nov.
-2. Interim maintenance windows from a git-ignored `maintenance.yaml` (as part of 17 or right after).
+1. Slice 17: review, elevated smoke test (install as LocalSystem against the test config, start,
+   stop, crash-restart, uninstall), commit, PR.
+2. Interim maintenance windows from a git-ignored `maintenance.yaml` (small slice, before shadow mode 26 Nov).
 3. When masked outputs arrive: add them to `tests/fixtures/` (winrm, weblogic, sql) and run the parse
    tests against them; fix an adapter if the real output differs from the synthetic format.
 4. Slice 16: login probe (Playwright) once the test user exists (A11 / Q20); decide first how a failed
@@ -230,6 +251,8 @@ is domain-joined. Consequences and mitigations until then:
 - Monitoring account: WinRM read access and Event Log Readers on every server (A07), WebLogic Monitor
   role (A09), SQL VIEW SERVER STATE + msdb read (A10). ODBC Driver 18 on the monitoring server.
 - Always deploy `config/rules.yaml` together with the code (new keys are required at start-up).
+- Python 3.12 for all users on the monitoring server; gMSA with Log on as a service; install steps in
+  `docs/service_install.md`. Shadow mode: owners.yaml lists only the monitoring team.
 
 ## Decisions pending
 - A12: application team to confirm architecture option A (direct polling) in writing.

@@ -242,6 +242,22 @@ class Collection(_Strict):
     history_views_enabled: bool
 
 
+class MonitorService(_Strict):
+    """The monitor's own Windows service (recovery, stop and log retention) - never an HFM service."""
+
+    restart_after_failure_seconds: list[int] = Field(min_length=1, max_length=3)
+    reset_failure_count_after_hours: int = Field(gt=0)
+    stop_timeout_seconds: int = Field(gt=0)
+    log_keep_days: int = Field(gt=0)
+
+    @field_validator("restart_after_failure_seconds")
+    @classmethod
+    def _delays(cls, delays: list[int]) -> list[int]:
+        if any(not 1 <= d <= 86400 for d in delays):
+            raise ValueError("restart_after_failure_seconds must be between 1 and 86400")
+        return delays
+
+
 class EnvironmentRules(_Strict):
     notices_enabled: bool
 
@@ -258,6 +274,7 @@ class Rules(_Strict):
     close_calendar: CloseCalendar
     maintenance: Maintenance
     collection: Collection
+    monitor_service: MonitorService
     environments: dict[str, EnvironmentRules] = Field(min_length=1)
 
     @field_validator("criticality_weights")
@@ -278,6 +295,11 @@ class Rules(_Strict):
             if getattr(self.checks, kind).timeout_seconds >= self.collection.poll_interval_seconds:
                 raise ValueError(f"checks.{kind}.timeout_seconds must be below "
                                  "collection.poll_interval_seconds")
+        longest = max(getattr(self.checks, k).timeout_seconds
+                      for k in ("windows_service", "weblogic_server", "sql_server", "url_probe"))
+        if self.monitor_service.stop_timeout_seconds <= longest:
+            raise ValueError("monitor_service.stop_timeout_seconds must be above every check timeout_seconds "
+                             f"({longest}) so a stop lets the running poll finish")
         probes = self.checks.url_probe.degraded_after_seconds
         for cid, comp in self.components.items():
             if comp.criticality not in self.criticality_weights:

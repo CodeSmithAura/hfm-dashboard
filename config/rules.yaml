@@ -222,6 +222,15 @@ collection:
   history_retention_days: 90             # ASSUMED Q40
   history_views_enabled: false           # CONFIRMED Q30 - nice to have, switch on later
 
+# ---------------------------------------------------------------------------
+# 6. The monitor's OWN Windows service (never an HFM service: auto_restart above stays false)
+# ---------------------------------------------------------------------------
+monitor_service:
+  restart_after_failure_seconds: [60, 120, 300]  # ASSUMED Q62 - Windows recovery: restart after 1st, 2nd, later crash
+  reset_failure_count_after_hours: 24    # ASSUMED Q62 - crash count starts again after a quiet day
+  stop_timeout_seconds: 90               # ASSUMED Q62 - a stop waits this long for a running poll; above every check timeout
+  log_keep_days: 30                      # ASSUMED Q62 - one log file per UTC day, older files deleted
+
 environments:
   PROD:    { notices_enabled: true }
   NONPROD: { notices_enabled: false }    # ASSUMED Q45 - dashboard only until decided

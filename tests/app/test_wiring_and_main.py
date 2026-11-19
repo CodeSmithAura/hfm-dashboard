@@ -230,3 +230,18 @@ def test_service_serves_dashboard_while_polling(config_dir):
         stop.set()
         t.join(20)
     assert result.get("code") == 0
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_dashboard_that_cannot_start_stops_the_monitor(config_dir):
+    """The filled template binds to an invented host: uvicorn cannot bind, so main returns 1 (in the
+    Windows service that is a crash and recovery retries) instead of polling without a dashboard."""
+    stop = threading.Event()
+    timer = threading.Timer(30, stop.set)     # safety net
+    timer.start()
+    try:
+        code = main(["--config-dir", str(config_dir), "--no-history"], collectors_factory=fake_factory,
+                    out=io.StringIO(), stop=stop)
+    finally:
+        timer.cancel()
+    assert code == 1 and not stop.is_set()
