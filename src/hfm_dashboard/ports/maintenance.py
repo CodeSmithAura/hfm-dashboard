@@ -1,4 +1,4 @@
-"""Port: maintenance windows for an environment (entered on the dashboard, slice 14)."""
+"""Port: maintenance windows for an environment (maintenance.yaml for now; the dashboard form in slice 15)."""
 
 from __future__ import annotations
 

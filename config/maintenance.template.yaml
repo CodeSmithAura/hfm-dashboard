@@ -1,0 +1,34 @@
+# HFM Availability Dashboard - planned maintenance windows TEMPLATE (interim, decision D32)
+#
+# Copy to maintenance.yaml on the monitoring server (git-ignored). The file name is set in rules.yaml
+# (maintenance.windows_file). Until the dashboard has a maintenance form (slice 15), this file is how
+# planned work is announced:
+#   - no caution notices for a covered component while the window is open; the outage timer starts
+#     again at the window end (rules.yaml maintenance.suppress_notices_in_window);
+#   - the dashboard shows a maintenance banner and covered cells as "Maintenance".
+#
+# Edit while the service runs: it is re-read on the next poll (no restart). If an edited file is
+# invalid, the previous windows stay in force and the problem is written to the log - check the log
+# after every edit. At start-up an invalid file stops the service from starting.
+#
+# Each window:
+#   environment: a name from environments.yaml (PROD, NONPROD, ...)
+#   component:   optional - a component id from rules.yaml (epmhfm, sql_server, ...);
+#                leave it out to cover every component of the environment
+#   start / end: ISO 8601 with Z (UTC) or an offset, e.g. 2026-11-28T18:00:00Z or 2026-11-28T23:30:00+05:30
+#                end is exclusive and must be after start; at most maintenance.max_window_hours long
+#   reason:      optional short text shown on the dashboard (no passwords or server names)
+#
+# Old windows can stay in the file; they no longer apply once ended.
+
+windows:
+  - environment: NONPROD
+    start: "2026-11-21T18:00:00Z"
+    end:   "2026-11-21T22:00:00Z"
+    reason: "Example: monthly Windows patching (whole environment)"
+
+  - environment: PROD
+    component: epmhfm
+    start: "2026-11-22T02:00:00Z"
+    end:   "2026-11-22T03:00:00Z"
+    reason: "Example: HFM application server restart"

@@ -233,6 +233,8 @@ class CloseCalendar(_Strict):
 class Maintenance(_Strict):
     suppress_notices_in_window: bool
     show_on_dashboard_as: str
+    windows_file: str
+    max_window_hours: int = Field(gt=0)
 
 
 class Collection(_Strict):

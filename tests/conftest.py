@@ -135,7 +135,8 @@ _BASE: dict[str, Any] = {
         "quarter_end_months": [3, 6, 9, 12],
         "extra_dates": [],
     },
-    "maintenance": {"suppress_notices_in_window": True, "show_on_dashboard_as": "Maintenance"},
+    "maintenance": {"suppress_notices_in_window": True, "show_on_dashboard_as": "Maintenance",
+                    "windows_file": "maintenance.yaml", "max_window_hours": 72},
     "collection": {
         "poll_interval_seconds": 60,
         "store_times_in": "UTC",

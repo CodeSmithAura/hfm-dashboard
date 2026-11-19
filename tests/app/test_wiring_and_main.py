@@ -245,3 +245,17 @@ def test_dashboard_that_cannot_start_stops_the_monitor(config_dir):
     finally:
         timer.cancel()
     assert code == 1 and not stop.is_set()
+
+
+class TestMaintenanceFile:
+    def test_invalid_maintenance_file_refuses_to_start(self, config_dir):
+        (config_dir / "maintenance.yaml").write_text(
+            'windows:\n  - environment: UAT\n    start: "2026-11-22T02:00:00Z"\n    end: "2026-11-22T03:00:00Z"\n',
+            encoding="utf-8")
+        assert main(["--config-dir", str(config_dir), "--once", "--no-history"],
+                    collectors_factory=fake_factory, out=io.StringIO()) == 2
+
+    def test_valid_maintenance_file_accepted(self, config_dir):
+        (config_dir / "maintenance.yaml").write_text("windows: []\n", encoding="utf-8")
+        assert main(["--config-dir", str(config_dir), "--once", "--no-history"],
+                    collectors_factory=fake_factory, out=io.StringIO()) == 0

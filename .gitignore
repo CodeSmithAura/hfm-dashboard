@@ -1,6 +1,7 @@
 # Real environment values and secrets never enter the repository
 config/environments.yaml
 config/owners.yaml
+config/maintenance.yaml
 *.local.yaml
 .env
 # Discovery raw output (contains real names)

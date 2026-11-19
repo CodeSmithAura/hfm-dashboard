@@ -63,6 +63,13 @@ Notices of environments with `notices_enabled: false` are only logged. Check del
 When updating the code on the server, update `config/rules.yaml` too: new keys are required and the
 program refuses to start on an outdated file.
 
+## Planned maintenance
+
+Until the dashboard has a maintenance form (slice 15), planned windows go into `config/maintenance.yaml`
+(copy `config/maintenance.template.yaml`, git-ignored): environment, optional component, start and end
+with `Z` or an offset. Covered components send no notices and show as Maintenance. The file is re-read
+on the next poll; an invalid edit keeps the previous windows and is logged - check the log after editing.
+
 ## Running as a Windows service
 
 On the monitoring server the monitor runs as the Windows service `HfmAvailabilityMonitor`

@@ -170,3 +170,9 @@ def test_bootstrap_check_runs_under_the_registered_command_line(options):
     result = subprocess.run([*args[:5], CHECK_FLAG, *args[5:]], capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "OK: interpreter" in result.stdout
+
+
+def test_self_check_covers_maintenance_file(options, capsys):
+    (options.config_dir / "maintenance.yaml").write_text("windows:\n  - environment: UAT\n", encoding="utf-8")
+    assert self_check(options) == 2
+    assert "maintenance.yaml" in capsys.readouterr().out

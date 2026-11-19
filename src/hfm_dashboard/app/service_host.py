@@ -179,11 +179,25 @@ def run_service(
 def self_check(options: ServiceOptions) -> int:
     """``--check``: what the service will need, without the service manager. Exit 0 ok, 2 problem."""
     from hfm_dashboard.config.startup import ConfigurationError, load_configuration
+    from hfm_dashboard.adapters.file_maintenance import FileMaintenanceCalendar
+    from hfm_dashboard.config.maintenance_loader import MaintenanceError
+    from hfm_dashboard.config.owners_loader import OwnersError, load_owners
     problems: list[str] = []
     try:
-        load_configuration(options.config_dir)
+        config = load_configuration(options.config_dir)
     except ConfigurationError as exc:
         problems.append(str(exc))
+        config = None
+    if config is not None:
+        try:
+            load_owners(options.config_dir, config.rules)
+        except OwnersError as exc:
+            problems.append(str(exc))
+        try:
+            FileMaintenanceCalendar(options.config_dir / config.rules.maintenance.windows_file, config.rules,
+                                    set(config.environments.environments))
+        except MaintenanceError as exc:
+            problems.append(str(exc))
     for folder in (options.data_dir, options.log_dir):
         try:
             folder.mkdir(parents=True, exist_ok=True)

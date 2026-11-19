@@ -1,13 +1,13 @@
 # Status (update as things change)
 
-Last updated: 19 Nov 2026
+Last updated: 19 Nov 2026 (slice 18)
 
 ## Plan
 - Target go-live: 30 Nov 2026 (production), with shadow mode from 26 Nov.
 - Live schedule with forecast dates: `docs/delivery_plan.xlsx` (dates recalculate from actuals).
 - Build: slices 1-14 done and merged (collectors, poll loop, history, notices, email, dashboard);
-  slice 17 (Windows service) built 19 Nov, awaiting review.
-  Remaining: interim maintenance file (next), 16 login probe, 15 HTTPS + login.
+  slice 17 (Windows service) merged 19 Nov (#9); slice 18 (maintenance file) built, awaiting review.
+  Remaining: 16 login probe, 15 HTTPS + login.
 - Nothing has run against a real server yet: access A06-A11 still open; design sign-off A12 open.
 
 ## Build progress
@@ -162,7 +162,8 @@ Last updated: 19 Nov 2026
   - Real sending needs the owner list (Q32 / A04) and relay access (A13).
   - Committed (`1645f41`), merged into `main` (pull request #6, `3d2ba95`).
 - Dashboard mockup (17 Nov): clickable canvas with desktop, tablet and phone widths and sample
-  scenarios; layout agreed by the user.
+  scenarios; layout agreed by the user. Design-tool export of the desktop view kept as a reference in
+  `docs/mockups/dashboard-desktop/` (not production code; loads web fonts and scripts from the internet).
 - Slice 14 (17 Nov): dashboard web app, 687 tests passing.
   - `presentation/dashboard.py` (pure view model: statuses, labels, order, durations, banners);
     `/api/v1/environments/{env}/dashboard` serves it as JSON (contract 1, `docs/ui.md`).
@@ -195,7 +196,17 @@ Last updated: 19 Nov 2026
   - Verified here: the registered command line in `--check` mode (base interpreter, isolated) loads the
     venv, pywin32 and configuration; the service body runs and stops the real loop. NOT yet verified:
     an actual install / start / stop through the service manager (needs an elevated prompt).
-  - Committed on branch `feature/slice17-windows-service`; pull request to open.
+  - Committed (`b67337f`), merged into `main` (pull request #9, `b7a284a`).
+- Slice 18 (19 Nov): interim maintenance windows file, 768 tests passing.
+  - `config/maintenance.template.yaml` -> `maintenance.yaml` on the server (git-ignored): environment,
+    optional component, start/end with a zone (UTC inside), reason. `domain/maintenance_file.py` (model,
+    checks), `config/maintenance_loader.py`, `adapters/file_maintenance.py` behind the existing
+    `MaintenanceCalendar` port; wired into the notice engine and the dashboard.
+  - Re-read on the next poll after an edit; invalid at start = start refused; invalid edit = previous
+    windows kept, error logged once; missing file = no windows. `hfm-service check` validates it (and
+    owners.yaml) too.
+  - New rules keys `maintenance.windows_file` and `max_window_hours: 72` (ASSUMED Q63). Decision D32.
+  - Committed on branch `feature/slice18-maintenance-file`; pull request to open.
 
 ### Git
 - All slices 1-14 are in `main` (latest merge: pull request #7, `c60ca9f`, 17 Nov). Merges use merge
@@ -225,14 +236,13 @@ is domain-joined. Consequences and mitigations until then:
   `monitoring.dashboard_bind: localhost`, or allow only trusted admin machines in the firewall.
   HTTPS + Windows login is a stated requirement: needed before go-live on 30 Nov, or accepted
   explicitly as a shadow-mode-only gap.
-- Maintenance windows cannot be entered, so planned work would email owners as an outage.
-  Mitigation: interim git-ignored `maintenance.yaml` read by the existing `MaintenanceCalendar` port
-  (small slice, before shadow mode).
+- Maintenance windows cannot be entered on the dashboard. Mitigation in place (slice 18): the
+  monitoring team writes them into `config/maintenance.yaml` on the server (process to agree, Q63).
 
 ### Next steps (resume here)
-1. Slice 17: review, elevated smoke test (install as LocalSystem against the test config, start,
-   stop, crash-restart, uninstall), commit, PR.
-2. Interim maintenance windows from a git-ignored `maintenance.yaml` (small slice, before shadow mode 26 Nov).
+1. Slice 18: review, commit, PR.
+2. Elevated smoke test of the slice 17 service (install as LocalSystem against a test config, start,
+   stop, crash-restart, uninstall) - before shadow mode 26 Nov.
 3. When masked outputs arrive: add them to `tests/fixtures/` (winrm, weblogic, sql) and run the parse
    tests against them; fix an adapter if the real output differs from the synthetic format.
 4. Slice 16: login probe (Playwright) once the test user exists (A11 / Q20); decide first how a failed
@@ -247,6 +257,7 @@ is domain-joined. Consequences and mitigations until then:
 - `environments.yaml` from the template: hosts, ports, `winrm`, `weblogic` (admin URL), `url_probes`,
   `sql`, `notices` (relay, port, from), `monitoring` (monitor host, dashboard bind and port).
 - `owners.yaml` from `owners.template.yaml` once the owner list exists (Q32).
+- `maintenance.yaml` from `maintenance.template.yaml` when planned work is announced (optional).
 - Secrets as environment variables until Q55 (e.g. `HFM_MON_PROD_WEBLOGIC_USERNAME` / `_PASSWORD`).
 - Monitoring account: WinRM read access and Event Log Readers on every server (A07), WebLogic Monitor
   role (A09), SQL VIEW SERVER STATE + msdb read (A10). ODBC Driver 18 on the monitoring server.

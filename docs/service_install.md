@@ -44,6 +44,8 @@ cd {{INSTALL_ROOT}}\app                      # copy of the repository (release t
 - `config\environments.yaml` from `environments.template.yaml`, every placeholder filled.
 - `config\owners.yaml` from `owners.template.yaml` (Q32). **Shadow mode:** list only the monitoring
   team as owners and default, so no component owner is emailed until go-live.
+- `config\maintenance.yaml` from `maintenance.template.yaml` when planned work is announced (delete the
+  example windows). Optional; edits apply on the next poll without a restart - check the log afterwards.
 
 ## 5. Permissions
 
@@ -135,4 +137,5 @@ the service and must be set again.
 | Log: "dashboard could not start" | Port in use or bind address not on this server (`monitoring` in environments.yaml); treated as a crash and retried |
 | Error 1069 at start | gMSA logon failed: Log on as a service right, or `Test-ADServiceAccount` fails |
 | Error 1053 at start | Interpreter did not start: Python moved or removed, or not readable by the gMSA; run `hfm-service check` |
+| Log: "maintenance.yaml changed but is invalid" | The edit was rejected and the previous windows still apply; fix the file (reason in the log) |
 | Every check Unknown | Monitoring access missing (A07-A10) or WebLogic secret not set (step 6); reasons in the log |
