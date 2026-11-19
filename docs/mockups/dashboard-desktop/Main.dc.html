@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HFM Availability Dashboard</title>
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#60a5fa}a:hover{color:#93c5fd}
+.dash{min-height:100vh;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.45}
+.wrap{max-width:1440px;margin:0 auto;padding:20px clamp(12px,3vw,32px) 40px;box-sizing:border-box;display:flex;flex-direction:column;gap:18px}
+.h{font-family:"Space Grotesk",Inter,sans-serif;letter-spacing:-0.01em}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;box-sizing:border-box;min-width:0}
+.muted{color:var(--muted)}
+.tabs{display:flex;gap:4px;padding:4px;background:var(--chip);border-radius:10px;flex-wrap:wrap}
+.tab{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;min-height:40px}
+.tab.on{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.pill{border:1px solid var(--line);background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:500;padding:8px 12px;border-radius:999px;cursor:pointer;min-height:40px}
+.pill.on{border-color:var(--accent);color:var(--text);background:var(--accentSoft)}
+.iconbtn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:14px}
+.kpi-label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.big{font-size:34px;font-weight:700;line-height:1.1}
+.split{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.left{flex:999 1 620px;min-width:0;display:flex;flex-direction:column;gap:18px}
+.right{flex:1 1 330px;min-width:0;display:flex;flex-direction:column;gap:18px}
+.gridbox{overflow-x:auto;margin:0 -4px;padding:0 4px 4px}
+.grid{display:grid;gap:6px;min-width:640px}
+.gh{font-size:12px;font-weight:600;color:var(--muted);padding:6px 4px;text-align:center;white-space:nowrap}
+.gh.first{text-align:left}
+.rowname{display:flex;flex-direction:column;justify-content:center;padding:6px 8px 6px 0;min-width:0}
+.rowname b{font-weight:600;font-size:13.5px}
+.rowname span{font-size:12px;color:var(--muted)}
+.cell{border:1px solid transparent;border-radius:9px;font:inherit;font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;cursor:pointer;padding:0 6px}
+.cell.sel{outline:2px solid var(--accent);outline-offset:2px}
+.na{border-radius:9px;min-height:44px;background:repeating-linear-gradient(135deg,transparent 0 6px,var(--chip) 6px 7px);opacity:.6}
+.s-up{background:var(--upBg);color:var(--up)}
+.s-deg{background:var(--degBg);color:var(--deg)}
+.s-down{background:var(--downBg);color:var(--down)}
+.s-unk{background:var(--unkBg);color:var(--unk)}
+.s-maint{background:var(--maintBg);color:var(--maint)}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600}
+.banner{display:flex;gap:12px;align-items:flex-start;border-radius:12px;padding:12px 16px;border:1px solid}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:var(--chip)}
+.bar{height:8px;border-radius:99px;background:var(--chip);overflow:hidden}
+.bar > div{height:100%;border-radius:99px}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;font-size:12.5px}
+.check{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.check:last-child{border-bottom:0}
+@media (max-width:560px){.big{font-size:28px}.hide-sm{display:none}}
+</style>
+</helmet>
+<div class="dash" style="{{rootStyle}}">
+<div class="wrap">
+
+  <header style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between">
+    <div style="display: flex; align-items: center; gap: 12px; min-width: 0">
+      <div style="width: 40px; height: 40px; border-radius: 11px; background: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#04131f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 12 7 12 10 4 14 20 17 12 21 12"></polyline></svg>
+      </div>
+      <div style="min-width: 0">
+        <div class="h" style="font-size: 20px; font-weight: 700">HFM Availability</div>
+        <div class="muted" style="font-size: 12.5px">Oracle HFM 11.2 · updated 09:42 UTC · polls every 60 s</div>
+      </div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+      <div class="tabs" role="tablist" aria-label="Environment">
+        <sc-for list="{{envTabs}}" as="t" hint-placeholder-count="2">
+          <button class="tab {{t.cls}}" role="tab" aria-selected="{{t.active}}" onClick="{{t.pick}}">{{t.label}}</button>
+        </sc-for>
+      </div>
+      <button class="iconbtn" aria-label="Switch light or dark theme" onClick="{{toggleTheme}}">
+        <sc-if value="{{dark}}" hint-placeholder-val="{{ true }}">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+        </sc-if>
+        <sc-if value="{{light}}" hint-placeholder-val="{{ false }}">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+        </sc-if>
+      </button>
+    </div>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+    <span class="muted" style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-right: 4px">Scenario (sample data)</span>
+    <sc-for list="{{scenarios}}" as="s" hint-placeholder-count="6">
+      <button class="pill {{s.cls}}" aria-pressed="{{s.active}}" onClick="{{s.pick}}">{{s.label}}</button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{showCap}}" hint-placeholder-val="{{ false }}">
+    <div class="banner" style="background: var(--downBg); border-color: var(--down); color: var(--text)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--down)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px" aria-hidden="true"><path d="M12 9v4M12 17h.01"></path><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+      <div><b>Score capped at 0%.</b> {{capText}} is a hard dependency and is fully down. Downstream notices are grouped under it.</div>
+    </div>
+  </sc-if>
+  <sc-if value="{{showMaint}}" hint-placeholder-val="{{ false }}">
+    <div class="banner" style="background: var(--maintBg); border-color: var(--maint); color: var(--text)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--maint)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"></path></svg>
+      <div><b>Maintenance 09:00 - 11:00 UTC:</b> HFM Server (patching node 3). Notices for it are suppressed; the timer restarts when the window ends.</div>
+    </div>
+  </sc-if>
+  <sc-if value="{{showNoticesOff}}" hint-placeholder-val="{{ false }}">
+    <div class="banner" style="background: var(--chip); border-color: var(--line); color: var(--text)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+      <div>Development: dashboard only. Notices are worked out and logged but not emailed (notices_enabled: false).</div>
+    </div>
+  </sc-if>
+
+  <section class="kpis" aria-label="Summary">
+    <div class="panel" style="display: flex; align-items: center; gap: 16px">
+      <svg width="104" height="104" viewBox="0 0 120 120" role="img" aria-label="Stability score {{pctText}}" style="flex-shrink: 0">
+        <circle cx="60" cy="60" r="50" fill="none" stroke="var(--chip)" stroke-width="12"></circle>
+        <circle cx="60" cy="60" r="50" fill="none" stroke="{{bandColor}}" stroke-width="12" stroke-linecap="round" stroke-dasharray="{{gaugeDash}}" transform="rotate(-90 60 60)"></circle>
+        <text x="60" y="66" text-anchor="middle" font-size="22" font-weight="700" fill="currentColor" font-family="Space Grotesk, Inter, sans-serif">{{pctShort}}</text>
+      </svg>
+      <div style="min-width: 0">
+        <div class="kpi-label">Stability score</div>
+        <div class="big h">{{pctText}}</div>
+        <span class="chip" style="background: {{bandBg}}; color: {{bandColor}}; margin-top: 6px">{{bandLabel}}</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="kpi-label">Components</div>
+      <div class="big h" style="margin: 4px 0 10px">{{compTotal}}</div>
+      <div class="legend">
+        <span class="chip s-up">{{cUp}} up</span>
+        <span class="chip s-deg">{{cDeg}} degraded</span>
+        <span class="chip s-down">{{cDown}} down</span>
+        <span class="chip s-unk">{{cUnk}} unknown</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="kpi-label">Open notices</div>
+      <div class="big h" style="margin: 4px 0 6px">{{openNotices}}</div>
+      <div class="muted" style="font-size: 13px">{{noticeHint}}</div>
+    </div>
+    <div class="panel">
+      <div class="kpi-label">Through the load balancer</div>
+      <div class="big h" style="margin: 4px 0 6px">{{lbOk}}</div>
+      <div class="muted" style="font-size: 13px">Shown, not scored (Q57)</div>
+    </div>
+  </section>
+
+  <div class="split">
+    <div class="left">
+      <section class="panel" aria-label="Component and node status">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 12px">
+          <h2 class="h" style="margin: 0; font-size: 17px">Components × nodes</h2>
+          <span class="muted" style="font-size: 12.5px">Select a cell for its checks</span>
+        </div>
+        <div class="gridbox">
+          <div class="grid" style="grid-template-columns: {{gridCols}}">
+            <div class="gh first">Component</div>
+            <sc-for list="{{nodeHeads}}" as="n" hint-placeholder-count="6">
+              <div class="gh">{{n.label}}</div>
+            </sc-for>
+            <sc-for list="{{rows}}" as="row" hint-placeholder-count="9">
+              <div class="rowname"><b>{{row.name}}</b><span>{{row.meta}}</span></div>
+              <sc-for list="{{row.cells}}" as="cell" hint-placeholder-count="6">
+                <sc-if value="{{cell.na}}" hint-placeholder-val="{{ false }}">
+                  <div class="na" aria-hidden="true"></div>
+                </sc-if>
+                <sc-if value="{{cell.on}}" hint-placeholder-val="{{ true }}">
+                  <button class="cell {{cell.cls}}" aria-label="{{cell.aria}}" onClick="{{cell.pick}}">
+                    <sc-if value="{{cell.isUp}}" hint-placeholder-val="{{ true }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg></sc-if>
+                    <sc-if value="{{cell.isDeg}}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20z"></path><path d="M12 10v4"></path></svg></sc-if>
+                    <sc-if value="{{cell.isDown}}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></sc-if>
+                    <sc-if value="{{cell.isUnk}}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"></path></svg></sc-if>
+                    <sc-if value="{{cell.isMaint}}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"></path></svg></sc-if>
+                    <span class="hide-sm">{{cell.label}}</span>
+                  </button>
+                </sc-if>
+              </sc-for>
+            </sc-for>
+          </div>
+        </div>
+        <div class="legend muted" style="margin-top: 14px">
+          <span class="chip s-up">Up</span><span class="chip s-deg">Degraded</span><span class="chip s-down">Down</span><span class="chip s-unk">Unknown (cannot check)</span><span class="chip s-maint">Maintenance</span>
+          <span>Hatched: component does not run on that node</span>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Selected cell">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: center">
+          <div style="min-width: 0">
+            <div class="kpi-label">{{detail.node}}</div>
+            <h2 class="h" style="margin: 2px 0 0; font-size: 17px">{{detail.name}}</h2>
+          </div>
+          <span class="chip {{detail.cls}}">{{detail.label}}</span>
+        </div>
+        <p class="muted" style="margin: 8px 0 6px; font-size: 13px">{{detail.since}}</p>
+        <div>
+          <sc-for list="{{detail.checks}}" as="c" hint-placeholder-count="4">
+            <div class="check">
+              <div style="min-width: 0"><b style="font-weight: 600">{{c.name}}</b><div class="muted" style="font-size: 12.5px">{{c.text}}</div></div>
+              <span class="chip {{c.cls}}" style="align-self: center; flex-shrink: 0">{{c.label}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Component scores">
+        <h2 class="h" style="margin: 0 0 12px; font-size: 17px">Component scores</h2>
+        <div class="list">
+          <sc-for list="{{compScores}}" as="cs" hint-placeholder-count="9">
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 6px 12px; align-items: center">
+              <div style="display: flex; justify-content: space-between; gap: 8px; font-size: 13px; min-width: 0"><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{cs.name}}</span><span class="muted" style="flex-shrink: 0">{{cs.weight}}</span></div>
+              <div style="text-align: right; font-weight: 600; font-size: 13px">{{cs.pct}}</div>
+              <div class="bar" style="grid-column: 1 / -1"><div style="{{cs.barStyle}}"></div></div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+
+    <div class="right">
+      <section class="panel" aria-label="Needs attention">
+        <h2 class="h" style="margin: 0 0 12px; font-size: 17px">Needs attention</h2>
+        <sc-if value="{{allClear}}" hint-placeholder-val="{{ false }}">
+          <div class="item" style="align-items: center">
+            <span class="chip s-up">All clear</span><span class="muted">Every monitored component is up.</span>
+          </div>
+        </sc-if>
+        <div class="list">
+          <sc-for list="{{attention}}" as="a" hint-placeholder-count="2">
+            <div class="item">
+              <span class="chip {{a.cls}}" style="flex-shrink: 0">{{a.label}}</span>
+              <div style="min-width: 0">
+                <b style="font-weight: 600">{{a.name}}</b>
+                <div class="muted" style="font-size: 12.5px">{{a.text}}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Notices">
+        <h2 class="h" style="margin: 0 0 12px; font-size: 17px">Notices today</h2>
+        <sc-if value="{{noNotices}}" hint-placeholder-val="{{ false }}">
+          <div class="muted">No notices sent today.</div>
+        </sc-if>
+        <div class="list">
+          <sc-for list="{{notices}}" as="n" hint-placeholder-count="2">
+            <div style="display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px">
+              <div class="muted" style="font-size: 12.5px; font-weight: 600; padding-top: 2px">{{n.time}}</div>
+              <div style="min-width: 0">
+                <span class="chip {{n.cls}}">{{n.kind}}</span>
+                <div style="font-size: 13px; margin-top: 4px">{{n.text}}</div>
+                <div class="muted" style="font-size: 12px">{{n.to}}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Load balancer probes">
+        <h2 class="h" style="margin: 0 0 4px; font-size: 17px">Load balancer probes</h2>
+        <p class="muted" style="margin: 0 0 10px; font-size: 12.5px">Through the user-facing URL · shown, not scored until Q57 is answered</p>
+        <sc-for list="{{lb}}" as="p" hint-placeholder-count="3">
+          <div class="check">
+            <div><b style="font-weight: 600">{{p.name}}</b><div class="muted" style="font-size: 12.5px">{{p.path}}</div></div>
+            <span class="chip {{p.cls}}" style="align-self: center">{{p.text}}</span>
+          </div>
+        </sc-for>
+      </section>
+    </div>
+  </div>
+
+  <footer class="muted" style="font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: space-between">
+    <span>Times in UTC (shown in your local time in the real dashboard) · weights and bands from rules.yaml</span>
+    <span>Mockup with sample data - not connected to any server</span>
+  </footer>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"startDark":{"editor":"boolean","default":true},"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { env: 'PROD', scenario: 'hfm', dark: props.startDark !== false, sel: 'epmhfm|hfm_node_02' };
+  }
+
+  renderVals() {
+    const dark = this.state.dark;
+    const T = dark ? {
+      bg: '#0b111c', panel: '#121a28', chip: '#1b2536', line: '#243146', text: '#e6edf7', muted: '#97a6bd',
+      accent: '#38bdf8', accentSoft: 'rgba(56,189,248,.14)',
+      up: '#5eead4', upBg: 'rgba(45,212,191,.13)', deg: '#fbbf24', degBg: 'rgba(251,191,36,.14)',
+      down: '#fb7185', downBg: 'rgba(251,113,133,.15)', unk: '#b4c0d3', unkBg: 'rgba(148,163,184,.16)',
+      maint: '#c4b5fd', maintBg: 'rgba(167,139,250,.16)'
+    } : {
+      bg: '#f3f6fa', panel: '#ffffff', chip: '#eef2f7', line: '#dfe5ee', text: '#0f1b2d', muted: '#536179',
+      accent: '#0284c7', accentSoft: 'rgba(2,132,199,.10)',
+      up: '#0f766e', upBg: '#dff5f1', deg: '#a35b00', degBg: '#fff1d6',
+      down: '#be123c', downBg: '#ffe2e7', unk: '#475569', unkBg: '#e8edf3',
+      maint: '#6d28d9', maintBg: '#efe8ff'
+    };
+    const rootStyle = Object.entries(T).map(([k, v]) => `--${k}:${v}`).join(';');
+
+    const COMPONENTS = [
+      { id: 'sql_server', name: 'SQL Server', crit: 'critical', w: 4, hard: true, nodes: ['db_node_01'],
+        checks: ['Windows service', 'SQL Server health', 'Disk space', 'Event log'] },
+      { id: 'sql_agent', name: 'SQL Server Agent', crit: 'medium', w: 2, hard: false, nodes: ['db_node_01'],
+        checks: ['Windows service', 'Disk space', 'Event log'] },
+      { id: 'shared_services', name: 'Foundation / Workspace', crit: 'critical', w: 4, hard: true, nodes: ['web_node_01', 'web_node_02'],
+        checks: ['Windows service', 'WebLogic server', 'URL probe /workspace/', 'Disk space', 'Event log'] },
+      { id: 'ohs_load_balancer', name: 'OHS / Load balancer', crit: 'critical', w: 4, hard: true, nodes: ['web_node_01', 'web_node_02'],
+        checks: ['Windows service', 'Disk space', 'Event log'] },
+      { id: 'epmhfm', name: 'HFM Server (cluster)', crit: 'critical', w: 4, hard: false, nodes: ['hfm_node_01', 'hfm_node_02', 'hfm_node_03'],
+        checks: ['Windows service', 'Disk space', 'Event log'] },
+      { id: 'hfm_web', name: 'HFM Web', crit: 'high', w: 3, hard: false, nodes: ['web_node_01', 'web_node_02'],
+        checks: ['Windows service', 'URL probe /hfmadf/', 'Disk space', 'Event log'] },
+      { id: 'fr_web', name: 'Financial Reporting Web', crit: 'medium', w: 2, hard: false, nodes: ['web_node_01', 'web_node_02'],
+        checks: ['Windows service', 'URL probe /hr/', 'Disk space', 'Event log'] },
+      { id: 'admin_server', name: 'WebLogic Admin Server', crit: 'low', w: 1, hard: false, nodes: ['web_node_01'],
+        checks: ['Windows service', 'WebLogic server', 'Disk space', 'Event log'] },
+      { id: 'ohs_node_manager', name: 'OHS Node Manager', crit: 'low', w: 1, hard: false, nodes: ['web_node_01', 'web_node_02'],
+        checks: ['Windows service', 'Disk space', 'Event log'] }
+    ];
+    const ENV_NODES = {
+      PROD: ['db_node_01', 'web_node_01', 'web_node_02', 'hfm_node_01', 'hfm_node_02', 'hfm_node_03'],
+      NONPROD: ['db_node_01', 'web_node_01', 'hfm_node_01']
+    };
+    const NODE_LABEL = { db_node_01: 'DB 1', web_node_01: 'Web 1', web_node_02: 'Web 2', hfm_node_01: 'HFM 1', hfm_node_02: 'HFM 2', hfm_node_03: 'HFM 3' };
+
+    // Scenario overrides: "component|node" -> { s: status, check: failing check, text, since }
+    const SCEN = {
+      healthy: { label: 'Healthy', o: {}, notices: [] },
+      hfm: { label: 'One HFM node down', o: {
+          'epmhfm|hfm_node_02': { s: 'down', check: 'Windows service', text: 'HyS9FinancialManagementJavaServer_EPMHFM2: service Stopped', since: 'Down since 09:01 UTC (41 min)' } },
+        notices: [{ time: '09:16', kind: 'Partial outage', cls: 's-down', text: 'HFM Server (cluster) - 1 of 3 nodes down since 09:01', to: 'To HFM owners' }] },
+      disk: { label: 'Low disk (today)', o: {
+          'sql_server|db_node_01': { s: 'deg', check: 'Disk space', text: 'C: 8.6% free < 10% (also seen by the SQL Server check)', since: 'Degraded since 06:12 UTC' },
+          'sql_agent|db_node_01': { s: 'deg', check: 'Disk space', text: 'C: 8.6% free < 10%', since: 'Degraded since 06:12 UTC' } },
+        notices: [] },
+      sql: { label: 'SQL Server down', o: {
+          'sql_server|db_node_01': { s: 'down', check: 'Windows service', text: 'MSSQLSERVER: service Stopped; SQL Server not reachable', since: 'Down since 09:05 UTC (37 min)' },
+          'sql_agent|db_node_01': { s: 'down', check: 'Windows service', text: 'SQLSERVERAGENT: service Stopped', since: 'Down since 09:05 UTC (37 min)' } },
+        notices: [
+          { time: '09:20', kind: 'Down', cls: 's-down', text: 'SQL Server - full outage since 09:05; also affected: SQL Server Agent', to: 'To DBA owners' },
+          { time: '09:50', kind: 'Reminder due', cls: 's-unk', text: 'Next reminder at 09:50, escalation to manager at 10:05', to: 'Scheduled' }] },
+      maint: { label: 'Maintenance', o: {
+          'epmhfm|hfm_node_03': { s: 'down', maint: true, check: 'Windows service', text: 'HyS9FinancialManagementJavaServer_EPMHFM3: service Stopped (planned)', since: 'In maintenance window 09:00 - 11:00 UTC' } },
+        notices: [] },
+      gap: { label: 'Monitoring gap', o: {
+          'epmhfm|hfm_node_03': { s: 'unk', check: 'Windows service', all: true, text: 'WinRM not reachable from the monitoring server', since: 'Unknown since 09:20 UTC (22 min)' } },
+        notices: [{ time: '09:35', kind: 'Cannot monitor', cls: 's-unk', text: 'HFM Server - 1 node cannot be checked since 09:20 (left out of the score)', to: 'To monitoring team' }] }
+    };
+
+    const env = this.state.env;
+    const nodes = ENV_NODES[env];
+    const scen = SCEN[this.state.scenario];
+    const LABEL = { up: 'Up', deg: 'Degraded', down: 'Down', unk: 'Unknown', maint: 'Maintenance' };
+    const CLS = { up: 's-up', deg: 's-deg', down: 's-down', unk: 's-unk', maint: 's-maint' };
+    const POINTS = { up: 100, deg: 50, down: 0 };
+
+    let sum = 0, wsum = 0, capped = [];
+    const counts = { up: 0, deg: 0, down: 0, unk: 0 };
+    const compScores = [], rows = [], attention = [];
+    let selected = null;
+
+    for (const c of COMPONENTS) {
+      const present = c.nodes.filter((n) => nodes.includes(n));
+      const statuses = present.map((n) => {
+        const o = scen.o[c.id + '|' + n];
+        return { n, s: o ? o.s : 'up', o };
+      });
+      const known = statuses.filter((x) => x.s !== 'unk');
+      let pct = null, cs = 'unk';
+      if (known.length) {
+        pct = known.reduce((a, x) => a + POINTS[x.s], 0) / known.length;
+        cs = known.every((x) => x.s === 'up') ? 'up' : known.every((x) => x.s === 'down') ? 'down' : 'deg';
+        sum += pct * c.w; wsum += c.w;
+      }
+      counts[cs] += 1;
+      if (c.hard && cs === 'down') capped.push(c.name);
+
+      const cells = nodes.map((n) => {
+        if (!present.includes(n)) return { na: true, on: false };
+        const st = statuses.find((x) => x.n === n);
+        const vis = st.o && st.o.maint ? 'maint' : st.s;
+        const key = c.id + '|' + n;
+        const isSel = this.state.sel === key;
+        const cell = {
+          na: false, on: true, label: LABEL[vis], cls: CLS[vis] + (isSel ? ' sel' : ''),
+          isUp: vis === 'up', isDeg: vis === 'deg', isDown: vis === 'down', isUnk: vis === 'unk', isMaint: vis === 'maint',
+          aria: c.name + ' on ' + NODE_LABEL[n] + ': ' + LABEL[vis],
+          pick: () => this.setState({ sel: key })
+        };
+        if (isSel) {
+          selected = {
+            name: c.name, node: NODE_LABEL[n] + ' (' + n + ')', label: LABEL[vis], cls: CLS[vis],
+            since: st.o ? st.o.since : 'Up since 26 Oct 09:26 UTC',
+            checks: c.checks.map((ck) => {
+              const failing = st.o && (st.o.all || st.o.check === ck);
+              const s = failing ? st.o.s : (st.o && st.o.all ? 'unk' : 'up');
+              const okText = ck === 'Disk space' ? 'Lowest volume 41% free' : ck === 'Event log' ? 'No crash events in last 60 min'
+                : ck.indexOf('URL probe') === 0 ? 'HTTP 200 in 1.2 s' : ck === 'WebLogic server' ? 'RUNNING, health ok, heap 58%'
+                : ck === 'SQL Server health' ? 'All checks within thresholds' : 'Running';
+              return { name: ck, text: failing ? st.o.text : okText, label: LABEL[s], cls: CLS[s] };
+            })
+          };
+        }
+        return cell;
+      });
+      rows.push({ name: c.name, meta: c.crit + ' · weight ' + c.w + (c.hard ? ' · hard dependency' : ''), cells });
+
+      const pctTxt = pct === null ? 'n/a' : (Math.round(pct * 100) / 100) + '%';
+      compScores.push({
+        name: c.name, weight: '×' + c.w, pct: pctTxt,
+        barStyle: 'width:' + (pct === null ? 0 : pct) + '%;background:' + (cs === 'up' ? T.up : cs === 'deg' ? T.deg : cs === 'down' ? T.down : T.unk)
+      });
+
+      for (const st of statuses) {
+        if (st.s !== 'up' && st.o) {
+          const vis = st.o.maint ? 'maint' : st.s;
+          attention.push({
+            rank: { down: 0, deg: 1, unk: 2, maint: 3 }[vis], name: c.name + ' · ' + NODE_LABEL[st.n],
+            text: st.o.text + ' - ' + st.o.since, label: LABEL[vis], cls: CLS[vis]
+          });
+        }
+      }
+    }
+    attention.sort((a, b) => a.rank - b.rank);
+
+    let pct = wsum ? Math.round((sum / wsum) * 100) / 100 : null;
+    if (capped.length && pct !== null) pct = 0;
+    const band = pct === null ? 'unk' : pct >= 95 ? 'green' : pct >= 70 ? 'amber' : 'red';
+    const bandColor = { green: T.up, amber: T.deg, red: T.down, unk: T.unk }[band];
+    const bandBg = { green: T.upBg, amber: T.degBg, red: T.downBg, unk: T.unkBg }[band];
+    const C = 2 * Math.PI * 50;
+    const filled = pct === null ? 0 : Math.max(pct, 0.5) / 100 * C;
+
+    if (!selected) {
+      selected = { name: 'Nothing selected', node: env === 'PROD' ? 'Production' : 'Development', label: '-', cls: 's-unk',
+        since: 'Select a cell in the grid to see its checks.', checks: [] };
+    }
+
+    const notices = env === 'PROD' ? scen.notices : scen.notices.map((n) => ({ ...n, to: 'Logged only (notices off in Development)' }));
+    const lbDown = this.state.scenario === 'sql';
+    const lb = [
+      { name: 'Workspace', path: '/workspace/' }, { name: 'HFM Web', path: '/hfmadf/' }, { name: 'Financial Reporting', path: '/hr/' }
+    ].map((p, i) => lbDown && i === 0
+      ? { ...p, text: 'HTTP 503', cls: 's-down' }
+      : { ...p, text: ['HTTP 302 · 0.9 s', 'HTTP 200 · 1.4 s', 'HTTP 200 · 2.1 s'][i], cls: 's-up' });
+
+    return {
+      rootStyle, dark, light: !dark,
+      toggleTheme: () => this.setState({ dark: !this.state.dark }),
+      envTabs: [['PROD', 'Production'], ['NONPROD', 'Development']].map(([id, label]) => ({
+        label, active: env === id ? 'true' : 'false', cls: env === id ? 'on' : '',
+        pick: () => this.setState({ env: id })
+      })),
+      scenarios: Object.entries(SCEN).map(([id, s]) => ({
+        label: s.label, active: this.state.scenario === id ? 'true' : 'false', cls: this.state.scenario === id ? 'on' : '',
+        pick: () => this.setState({ scenario: id })
+      })),
+      showCap: capped.length > 0, capText: capped.join(', '),
+      showMaint: this.state.scenario === 'maint' && env === 'PROD',
+      showNoticesOff: env === 'NONPROD',
+      pctText: pct === null ? 'n/a' : pct.toFixed(2) + '%',
+      pctShort: pct === null ? 'n/a' : (pct >= 99.995 ? '100' : pct.toFixed(1)),
+      bandLabel: { green: 'Green', amber: 'Amber', red: 'Red', unk: 'Unknown' }[band] + (capped.length ? ' · capped' : ''),
+      bandColor, bandBg, gaugeDash: filled + ' ' + C,
+      compTotal: COMPONENTS.length,
+      cUp: counts.up, cDeg: counts.deg, cDown: counts.down, cUnk: counts.unk,
+      openNotices: notices.filter((n) => n.kind !== 'Reminder due').length,
+      noticeHint: notices.length ? 'First notice after 15 min (5 in close periods)' : 'Nothing has reached the 15 min threshold',
+      lbOk: lb.filter((p) => p.cls === 's-up').length + ' / 3 ok',
+      gridCols: 'minmax(170px, 1.6fr) repeat(' + nodes.length + ', minmax(84px, 1fr))',
+      nodeHeads: nodes.map((n) => ({ label: NODE_LABEL[n] })),
+      rows, detail: selected, compScores, attention, allClear: attention.length === 0,
+      notices, noNotices: notices.length === 0, lb
+    };
+  }
+}
+</script>
+</body>
+</html>
