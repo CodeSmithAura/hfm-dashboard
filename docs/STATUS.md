@@ -1,12 +1,12 @@
 # Status (update as things change)
 
-Last updated: 19 Nov 2026 (slice 18)
+Last updated: 19 Nov 2026 (service smoke test)
 
 ## Plan
 - Target go-live: 30 Nov 2026 (production), with shadow mode from 26 Nov.
 - Live schedule with forecast dates: `docs/delivery_plan.xlsx` (dates recalculate from actuals).
 - Build: slices 1-14 done and merged (collectors, poll loop, history, notices, email, dashboard);
-  slice 17 (Windows service) merged 19 Nov (#9); slice 18 (maintenance file) built, awaiting review.
+  slices 17 (Windows service, smoke-tested) and 18 (maintenance file) merged 19 Nov (#9, #10).
   Remaining: 16 login probe, 15 HTTPS + login.
 - Nothing has run against a real server yet: access A06-A11 still open; design sign-off A12 open.
 
@@ -194,8 +194,13 @@ Last updated: 19 Nov 2026 (slice 18)
   - New rules block `monitor_service` (restart delays 60/120/300 s, reset 24 h, stop timeout 90 s, logs
     kept 30 days; ASSUMED Q62). Decision D31. Runbook `docs/service_install.md`.
   - Verified here: the registered command line in `--check` mode (base interpreter, isolated) loads the
-    venv, pywin32 and configuration; the service body runs and stops the real loop. NOT yet verified:
-    an actual install / start / stop through the service manager (needs an elevated prompt).
+    venv, pywin32 and configuration; the service body runs and stops the real loop.
+  - Smoke test 19 Nov (user's workstation, elevated, LocalSystem, invented hosts, dashboard on
+    localhost) - all passed: install with recovery actions; start, dashboard listening, polls logged
+    (132 polls over ~3 h 20 min), `/healthz` 200; clean stop ("service stopped"); process killed ->
+    Windows restarted it after ~70 s; invalid maintenance.yaml -> start-up refused, event 7024, not
+    restarted; uninstall. pywin32 hosting with the base interpreter works, so the WinSW fallback (D31)
+    is not needed. Still to see on the real server: running as the gMSA (logon right, folder access).
   - Committed (`b67337f`), merged into `main` (pull request #9, `b7a284a`).
 - Slice 18 (19 Nov): interim maintenance windows file, 768 tests passing.
   - `config/maintenance.template.yaml` -> `maintenance.yaml` on the server (git-ignored): environment,
@@ -206,7 +211,7 @@ Last updated: 19 Nov 2026 (slice 18)
     windows kept, error logged once; missing file = no windows. `hfm-service check` validates it (and
     owners.yaml) too.
   - New rules keys `maintenance.windows_file` and `max_window_hours: 72` (ASSUMED Q63). Decision D32.
-  - Committed on branch `feature/slice18-maintenance-file`; pull request to open.
+  - Committed (`970988b`, mockup move `656f9e8`), merged into `main` (pull request #10, `789b372`).
 
 ### Git
 - All slices 1-14 are in `main` (latest merge: pull request #7, `c60ca9f`, 17 Nov). Merges use merge
@@ -240,9 +245,10 @@ is domain-joined. Consequences and mitigations until then:
   monitoring team writes them into `config/maintenance.yaml` on the server (process to agree, Q63).
 
 ### Next steps (resume here)
-1. Slice 18: review, commit, PR.
-2. Elevated smoke test of the slice 17 service (install as LocalSystem against a test config, start,
-   stop, crash-restart, uninstall) - before shadow mode 26 Nov.
+1. Shadow mode prep (26 Nov), once the monitoring server and gMSA exist (A06, A07): install per
+   `docs/service_install.md`, owners.yaml with the monitoring team only, agree the maintenance process (Q63).
+2. Decide Q55 (secret store) before go-live; until then the WebLogic secret sits in the service's
+   registry Environment value (readable by local users).
 3. When masked outputs arrive: add them to `tests/fixtures/` (winrm, weblogic, sql) and run the parse
    tests against them; fix an adapter if the real output differs from the synthetic format.
 4. Slice 16: login probe (Playwright) once the test user exists (A11 / Q20); decide first how a failed
