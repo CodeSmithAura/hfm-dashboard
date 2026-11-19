@@ -23,6 +23,7 @@ from typing import TextIO
 from datetime import UTC, datetime, timedelta
 
 from hfm_dashboard.adapters.env_secrets import EnvironmentSecretStore
+from hfm_dashboard.adapters.file_maintenance import FileMaintenanceCalendar
 from hfm_dashboard.adapters.smtp_mail import SmtpMailSender
 from hfm_dashboard.adapters.sqlite_history import SqliteHistory
 from hfm_dashboard.app.dashboard_source import LiveDashboardSource
@@ -33,6 +34,7 @@ from hfm_dashboard.app.poller import Collectors, Poller, PollSnapshot
 from hfm_dashboard.app.scheduler import build_scheduler
 from hfm_dashboard.app.web_server import WebServer
 from hfm_dashboard.app.wiring import build_collectors
+from hfm_dashboard.config.maintenance_loader import MaintenanceError
 from hfm_dashboard.config.owners_loader import OwnersError, load_owners
 from hfm_dashboard.config.startup import ConfigurationError, load_configuration
 from hfm_dashboard.domain.environment import Environment
@@ -131,6 +133,12 @@ def main(
         return 2
     if owners is None:
         log.warning("%s not found: notices are worked out and logged but not emailed", rules.notices.owners_file)
+    try:
+        maintenance = FileMaintenanceCalendar(args.config_dir / rules.maintenance.windows_file, rules,
+                                              set(config.environments.environments))
+    except MaintenanceError as exc:
+        print(f"refusing to start: {exc}", file=sys.stderr)
+        return 2
 
     if args.test_email:
         env = config.environments.environments.get(args.test_email)
@@ -160,7 +168,7 @@ def main(
 
     pollers = [Poller(n, config.environments.environments[n], rules,
                       collectors_factory(n, config.environments.environments[n], rules), history=history,
-                      notices=NoticeTracker(n, rules, history=history, deliver=NoticeMailer(
+                      notices=NoticeTracker(n, rules, maintenance=maintenance, history=history, deliver=NoticeMailer(
                           config.environments.environments[n], rules, owners,
                           sender_factory(config.environments.environments[n], rules))))
                for n in names]
@@ -196,7 +204,8 @@ def main(
     if not args.no_web:
         from hfm_dashboard.web.app import create_app
         envs = config.environments.environments
-        source = LiveDashboardSource({p.name: p for p in pollers}, {n: envs[n] for n in names}, history)
+        source = LiveDashboardSource({p.name: p for p in pollers}, {n: envs[n] for n in names}, history,
+                                     maintenance=maintenance)
         mon = config.environments.monitoring
         web = WebServer(create_app(source, rules, ui_dir=args.ui_dir), mon.dashboard_bind, mon.dashboard_port)
     if web is not None and not web.start():

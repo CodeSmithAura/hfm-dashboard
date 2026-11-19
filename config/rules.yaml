@@ -210,8 +210,10 @@ close_calendar:                          # ASSUMED Q46 - which days use first_no
   extra_dates: []                        # add specific close dates here, YYYY-MM-DD
 
 maintenance:
-  suppress_notices_in_window: true       # ASSUMED Q36 - windows entered on the dashboard
+  suppress_notices_in_window: true       # ASSUMED Q36 - windows from windows_file until the dashboard form (slice 15)
   show_on_dashboard_as: "Maintenance"
+  windows_file: maintenance.yaml         # interim (D32): planned windows, re-read on change; kept out of the repository
+  max_window_hours: 72                   # ASSUMED Q63 - a longer window is refused, so a mistyped date cannot mute notices for months
 
 # ---------------------------------------------------------------------------
 # 5. Collection and history
