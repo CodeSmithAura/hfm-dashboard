@@ -6,7 +6,8 @@
     hfm-dashboard ... --once --no-history         # dry run: read nothing from and write nothing to history
 
 Until the dashboard exists, each poll is summarised in the log. Secrets come from the
-environment-variable secret store (interim, Q55). Exit codes: 0 ok, 2 configuration problem.
+environment-variable secret store (interim, Q55). Exit codes: 0 ok, 1 dashboard could not start,
+2 configuration problem.
 """
 
 from __future__ import annotations
@@ -15,7 +16,6 @@ import argparse
 import logging
 import sys
 import threading
-import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import TextIO
@@ -26,6 +26,7 @@ from hfm_dashboard.adapters.env_secrets import EnvironmentSecretStore
 from hfm_dashboard.adapters.smtp_mail import SmtpMailSender
 from hfm_dashboard.adapters.sqlite_history import SqliteHistory
 from hfm_dashboard.app.dashboard_source import LiveDashboardSource
+from hfm_dashboard.app.logs import NOISY_LOGGERS, configure_logging, quiet_libraries  # noqa: F401 - re-exported
 from hfm_dashboard.app.notice_mailer import NoticeMailer
 from hfm_dashboard.app.notice_tracker import NoticeTracker
 from hfm_dashboard.app.poller import Collectors, Poller, PollSnapshot
@@ -198,9 +199,10 @@ def main(
         source = LiveDashboardSource({p.name: p for p in pollers}, {n: envs[n] for n in names}, history)
         mon = config.environments.monitoring
         web = WebServer(create_app(source, rules, ui_dir=args.ui_dir), mon.dashboard_bind, mon.dashboard_port)
+    if web is not None and not web.start():
+        web.stop()
+        return 1        # in the Windows service: a crash, so recovery retries (e.g. port still in use)
     scheduler.start()
-    if web is not None:
-        web.start()
     log.info("polling %s every %s s", ", ".join(names), rules.collection.poll_interval_seconds)
     try:
         while not stop.wait(1.0):
@@ -214,20 +216,8 @@ def main(
     return 0
 
 
-NOISY_LOGGERS = ("pypsrp", "spnego", "requests", "urllib3", "httpx", "httpcore", "apscheduler")
-
-
-def quiet_libraries() -> None:
-    """Library INFO logs repeat every poll and include scripts and URLs with host names: keep only
-    their warnings and errors."""
-    for name in NOISY_LOGGERS:
-        logging.getLogger(name).setLevel(logging.WARNING)
-
-
 def run() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    logging.Formatter.converter = time.gmtime   # log timestamps in UTC (hard rule 5)
-    quiet_libraries()
+    configure_logging()   # console, UTC timestamps (hard rule 5); the service adds a log file
     raise SystemExit(main())
 
 

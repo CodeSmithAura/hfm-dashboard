@@ -142,6 +142,12 @@ _BASE: dict[str, Any] = {
         "history_retention_days": 90,
         "history_views_enabled": False,
     },
+    "monitor_service": {
+        "restart_after_failure_seconds": [60, 120, 300],
+        "reset_failure_count_after_hours": 24,
+        "stop_timeout_seconds": 90,
+        "log_keep_days": 30,
+    },
     "environments": {"PROD": {"notices_enabled": True}},
 }
 

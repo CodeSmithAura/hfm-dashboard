@@ -7,6 +7,8 @@ config/owners.yaml
 hfm_discovery_*/
 # Runtime data
 data/
+logs/
+*.log
 *.sqlite
 *.db
 __pycache__/

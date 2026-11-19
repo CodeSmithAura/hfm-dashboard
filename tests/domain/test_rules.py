@@ -174,3 +174,36 @@ class TestSqlServerTimeout:
         rules_dict["checks"]["sql_server"]["degraded_if_backup_failed_in_last_hours"] = 24
         invalid(rules_dict, "degraded_if_backup_failed_in_last_hours")
 
+
+
+class TestMonitorService:
+    """rules.yaml monitor_service: the monitor's own Windows service (slice 17, ASSUMED Q62)."""
+
+    def test_repo_values(self, repo_rules):
+        ms = repo_rules.monitor_service
+        assert ms.restart_after_failure_seconds == [60, 120, 300]
+        assert ms.reset_failure_count_after_hours == 24
+        assert ms.stop_timeout_seconds == 90
+        assert ms.log_keep_days == 30
+
+    def test_required(self, rules_dict):
+        del rules_dict["monitor_service"]
+        invalid(rules_dict, "monitor_service")
+
+    def test_unknown_key_refused(self, rules_dict):
+        rules_dict["monitor_service"]["restart_hfm_services"] = True
+        invalid(rules_dict, "restart_hfm_services")
+
+    @pytest.mark.parametrize("delays", [[], [60, 60, 60, 60], [0], [86401]])
+    def test_restart_delays_range(self, rules_dict, delays):
+        rules_dict["monitor_service"]["restart_after_failure_seconds"] = delays
+        invalid(rules_dict, "restart_after_failure_seconds")
+
+    @pytest.mark.parametrize("key", ["reset_failure_count_after_hours", "stop_timeout_seconds", "log_keep_days"])
+    def test_positive(self, rules_dict, key):
+        rules_dict["monitor_service"][key] = 0
+        invalid(rules_dict, key)
+
+    def test_stop_timeout_above_every_check_timeout(self, rules_dict):
+        rules_dict["monitor_service"]["stop_timeout_seconds"] = 60   # url_probe timeout is 60
+        invalid(rules_dict, "stop_timeout_seconds must be above every check timeout")

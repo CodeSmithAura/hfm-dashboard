@@ -63,6 +63,21 @@ Notices of environments with `notices_enabled: false` are only logged. Check del
 When updating the code on the server, update `config/rules.yaml` too: new keys are required and the
 program refuses to start on an outdated file.
 
+## Running as a Windows service
+
+On the monitoring server the monitor runs as the Windows service `HfmAvailabilityMonitor`
+(automatic start, restarted by Windows after a crash, log files per UTC day). Full steps:
+`docs/service_install.md`. In short, from an elevated prompt:
+
+```
+.venv\Scripts\hfm-service check   --config-dir <abs>\config --data-dir <abs>\data --log-dir <abs>\logs
+.venv\Scripts\hfm-service install --config-dir ... --data-dir ... --log-dir ... --account <DOMAIN>\<gmsa>$
+Start-Service HfmAvailabilityMonitor
+.venv\Scripts\hfm-service status | uninstall
+```
+
+Recovery delays, stop timeout and log retention come from rules.yaml `monitor_service`.
+
 ## Dashboard
 
 Served by the same service at `monitoring.dashboard_bind` / `dashboard_port` from `environments.yaml`
