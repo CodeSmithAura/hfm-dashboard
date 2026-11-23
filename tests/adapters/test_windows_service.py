@@ -46,3 +46,11 @@ def test_query_of_missing_service_is_none():
     from hfm_dashboard.adapters.windows_service import PywinServiceControl
 
     assert PywinServiceControl().info("HfmMonitorTestNoSuchService") is None
+
+
+def test_grant_to_unknown_account_names_the_problem():
+    from hfm_dashboard.adapters.windows_service import PywinServiceControl
+    from hfm_dashboard.ports.service_control import ServiceControlError
+
+    with pytest.raises(ServiceControlError, match="was not found"):
+        PywinServiceControl().grant_service_logon("hfm-monitor-no-such-account-test")

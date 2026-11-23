@@ -48,7 +48,7 @@ environments:
     winrm:                           # Windows services collector (A07, A08)
       port: "{{WINRM_PORT}}"
       use_ssl: false                 # HTTP listener; Negotiate/Kerberos still encrypts the payload. true for an HTTPS listener
-      auth: negotiate                # negotiate or kerberos; the service's gMSA identity is used, no password stored
+      auth: negotiate                # negotiate or kerberos; the service account's identity is used, no password stored here
 
     weblogic:                        # WebLogic REST management API on the Admin Server (A09: read-only Monitor user)
       admin_url: "{{WLS_ADMIN_URL}}" # scheme://host:port of the Admin Server on web node 1
@@ -68,7 +68,7 @@ environments:
 
     sql:                             # SQL Server health queries (A10: read-only login with VIEW SERVER STATE, msdb read)
       port: sql                      # key in ports above
-      auth: windows                  # windows = the service's gMSA (no password); sql = secrets.sql_monitor_login
+      auth: windows                  # windows = the service account (no password here); sql = secrets.sql_monitor_login
       encrypt: true
       trust_server_certificate: false
 
@@ -126,12 +126,15 @@ environments:
     display_name: "Non-Production (Development)"
     notices_enabled: false           # pending decision on non-prod alerting (Q45)
 
-    load_balancer:
-      url: "{{NP_LB_URL}}"
-      paths:
-        workspace: "/workspace/"
-        hfm_web: "/hfmadf/"
-        fr_web: "/hr/"
+    # load_balancer is optional (D34). Development has no front door, so it is left out: no probes
+    # "through the load balancer" for this environment. If users reach Workspace through one (an OHS
+    # URL), add the block back with that URL:
+    # load_balancer:
+    #   url: "{{NP_LB_URL}}"
+    #   paths:
+    #     workspace: "/workspace/"
+    #     hfm_web: "/hfmadf/"
+    #     fr_web: "/hr/"
 
     nodes:
       db_node_01:  { host: "{{NP_DB_NODE_01}}",  role: database }
@@ -167,7 +170,7 @@ environments:
 
     sql:                             # SQL Server health queries (A10: read-only login with VIEW SERVER STATE, msdb read)
       port: sql                      # key in ports above
-      auth: windows                  # windows = the service's gMSA (no password); sql = secrets.sql_monitor_login
+      auth: windows                  # windows = the service account (no password here); sql = secrets.sql_monitor_login
       encrypt: true
       trust_server_certificate: false
 

@@ -112,7 +112,7 @@ class Environment(_Strict):
     display_name: NonEmpty
     notices_enabled: bool | None = None   # optional; rules.yaml environments.<name> is authoritative
     timezone_note: str = ""
-    load_balancer: LoadBalancer
+    load_balancer: LoadBalancer | None = None    # optional (D34): no front door -> no LB probes
     nodes: dict[str, Node] = Field(min_length=1)
     ports: dict[str, Port]
     winrm: WinRM
@@ -141,6 +141,8 @@ class Environment(_Strict):
         return f"{self.url_probes.scheme}://{self.nodes[node].host}:{self.ports[target.port]}{target.path}"
 
     def lb_probe_url(self, probe: str) -> str:
+        if self.load_balancer is None:
+            raise ValueError("this environment has no load_balancer")
         return f"{self.load_balancer.url}{self.url_probes.probes[probe].path}"
 
     def names_for(self, check_kind: str) -> tuple[str, dict[str, dict[str, str]]]:

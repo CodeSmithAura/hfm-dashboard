@@ -185,6 +185,9 @@ class DashboardView:
     lb_note: str = field(default="Shown, not scored until Q57 is answered")
 
 
+NO_LB_NOTE = "No load balancer configured for this environment"
+
+
 def as_dict(view: DashboardView) -> dict:
     return asdict(view)
 
@@ -339,7 +342,8 @@ def build_dashboard(
                   tuple(enabled[c].display_name for c in score.capped_by)),
         Counts(len(enabled), counts["up"], counts["degraded"], counts["down"], counts["unknown"]),
         tuple(banners), tuple(NodeHead(n, node_label(n)) for n in nodes), tuple(rows), detail,
-        tuple(attention), notices, probes, scores)
+        tuple(attention), notices, probes, scores,
+        **({} if env.load_balancer else {"lb_note": NO_LB_NOTE}))
 
 
 def _meta(comp, rules: Rules) -> str:

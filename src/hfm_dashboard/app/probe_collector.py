@@ -63,7 +63,7 @@ def plan(env: Environment, rules: Rules) -> tuple[list[ProbeTarget], list[ProbeT
         ProbeTarget(cid, LB_NODE, probe, env.lb_probe_url(probe), env.url_probes.probes[probe].path)
         for cid, comp in rules.enabled_components().items() if comp.lb_probe
         for probe in used
-    ]
+    ] if env.load_balancer is not None else []     # no front door in this environment (D34)
     return node_targets, lb_targets
 
 

@@ -49,10 +49,26 @@ class TestPlan:
             ("ohs_load_balancer", LB_NODE, "fr_web", f"{LB}/hr/"),
         ]
 
-    def test_nonprod(self, envs, repo_rules):
+    def test_nonprod_without_load_balancer(self, envs, repo_rules):
+        assert envs["NONPROD"].load_balancer is None                  # left out in the template (D34)
         node_targets, lb_targets = plan(envs["NONPROD"], repo_rules)
-        assert len(node_targets) == 3 and len(lb_targets) == 3
+        assert len(node_targets) == 3 and lb_targets == []
         assert all("np-web-node-01" in t.url for t in node_targets)
+
+    def test_nonprod_with_load_balancer(self, repo_rules):
+        text = FILLED.replace("    # load_balancer:\n    #   url: \"https://lb.example.test\"\n"
+                              "    #   paths:\n", "    load_balancer:\n      url: \"https://np-lb.example.test\"\n"
+                              "      paths: {}\n", 1)
+        env = parse_environments(text, repo_rules).environments["NONPROD"]
+        _, lb_targets = plan(env, repo_rules)
+        assert [t.url for t in lb_targets] == ["https://np-lb.example.test/workspace/",
+                                               "https://np-lb.example.test/hfmadf/",
+                                               "https://np-lb.example.test/hr/"]
+
+    def test_no_load_balancer_collects_node_probes_only(self, envs, repo_rules):
+        prober = FakeUrlProber()
+        res = collect_url_probes(envs["NONPROD"], repo_rules, prober, T0)
+        assert len(res.nodes) == 3 and res.load_balancer == [] and len(prober.calls) == 3
 
 
 class TestCollect:
