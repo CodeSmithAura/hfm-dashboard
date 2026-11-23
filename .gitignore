@@ -19,3 +19,5 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+wheelhouse/
+wheelhouse.zip

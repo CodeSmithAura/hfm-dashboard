@@ -290,6 +290,9 @@ is domain-joined. Consequences and mitigations until then:
 - Monitoring account: WinRM read access and Event Log Readers on every server (A07), WebLogic Monitor
   role (A09), SQL VIEW SERVER STATE + msdb read (A10). ODBC Driver 18 on the monitoring server.
 - Always deploy `config/rules.yaml` together with the code (new keys are required at start-up).
+- 23 Nov: the monitoring server cannot reach PyPI (SSL error on `pip install .`): install offline from
+  a wheelhouse built on the workstation (runbook step 3b; verified here with `--no-index` into a
+  fresh venv). Offline upgrades need `--force-reinstall` while the version stays 0.1.0.
 - Python 3.12 for all users on the monitoring server; service account (gMSA planned, interim domain
   user with `--ask-password`, D33) - install grants Log on as a service; install steps in
   `docs/service_install.md`. Shadow mode: owners.yaml lists only the monitoring team.
