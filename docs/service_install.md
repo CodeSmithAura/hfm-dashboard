@@ -43,15 +43,52 @@ ordinary user skip `Install-ADServiceAccount` / `Test-ADServiceAccount` - they a
 {{INSTALL_ROOT}}\config   rules.yaml, environments.yaml, owners.yaml (service account: read; admins: write)
 {{INSTALL_ROOT}}\data     history.sqlite (service account: modify)
 {{INSTALL_ROOT}}\logs     hfm-dashboard.log, one file per UTC day (service account: modify)
+{{INSTALL_ROOT}}\wheelhouse  offline packages, only if the server has no internet (step 3b)
 ```
 
 ## 3. Install the code (elevated PowerShell)
 
+Copy the whole repository (release tag) into `{{INSTALL_ROOT}}\app` - `pip` needs `pyproject.toml`
+next to `src`. Never copy a `.venv` from another machine; create it on the server. The service runs
+the copy that `pip` puts into `.venv`, so after any code change install again.
+
+Check first: `& "{{PYTHON_EXE}}" -V` must show Python 3.12, 64-bit (several packages are built for
+exactly that version).
+
+### 3a. Server with internet access to PyPI
+
 ```powershell
-cd {{INSTALL_ROOT}}\app                      # copy of the repository (release tag)
+cd {{INSTALL_ROOT}}\app
 & "{{PYTHON_EXE}}" -m venv .venv
 .venv\Scripts\python -m pip install .
 ```
+
+If this fails with an SSL error such as `UNEXPECTED_EOF_WHILE_READING` or "could not fetch URL
+https://pypi.org/...", the server cannot reach PyPI (firewall or proxy): use 3b. Nothing was changed
+by the failed attempt; the same `.venv` can be used.
+
+### 3b. Server without internet access (offline wheelhouse)
+
+On a build machine **with** internet, Windows, Python 3.12 64-bit, in a checkout of the same release
+(with its own venv):
+
+```powershell
+cd <repository>
+.venv\Scripts\python -m pip wheel . -w <folder>\wheelhouse      # the monitor + every dependency, ~17 MB
+Compress-Archive <folder>\wheelhouse <folder>\wheelhouse.zip -Force
+```
+
+Copy `wheelhouse.zip` to the server and unzip it as `{{INSTALL_ROOT}}\wheelhouse`. Then on the server:
+
+```powershell
+cd {{INSTALL_ROOT}}\app
+& "{{PYTHON_EXE}}" -m venv .venv
+.venv\Scripts\python -m pip install --no-index --find-links {{INSTALL_ROOT}}\wheelhouse hfm-dashboard
+.venv\Scripts\hfm-service --help                                  # installed?
+```
+
+`--no-index` keeps pip off the internet entirely. The code then comes from the wheelhouse, not from
+`app\src`; `app` is still the source of `config\*.yaml` templates and `rules.yaml`.
 
 ## 4. Configuration
 
@@ -151,11 +188,17 @@ Ask the client whether the password expires and who changes it (Q64).
 
 ```powershell
 Stop-Service HfmAvailabilityMonitor
-# replace {{INSTALL_ROOT}}\app with the new release, then: .venv\Scripts\python -m pip install .
+# replace {{INSTALL_ROOT}}\app with the new release (keep .venv), then install it:
+.venv\Scripts\python -m pip install .                                            # 3a, with internet
+# or, offline (3b): rebuild the wheelhouse from the new release, replace {{INSTALL_ROOT}}\wheelhouse, then
+.venv\Scripts\python -m pip install --no-index --find-links {{INSTALL_ROOT}}\wheelhouse --force-reinstall hfm-dashboard
 # update config\rules.yaml from the same release
 .venv\Scripts\hfm-service check @opts
 Start-Service HfmAvailabilityMonitor
 ```
+
+Offline, `--force-reinstall` is required while the version number stays the same (0.1.0): without
+it pip reports "already satisfied" and keeps the old code.
 
 Uninstall and install again if the Python installation, the folders, the account or the recovery
 values in rules.yaml change (they are fixed at install time). The Environment value from step 6 is
@@ -199,5 +242,7 @@ changes when PROD is added later.
 | `install`: "is an ordinary user account: add --ask-password" | The account has a password; repeat with `--ask-password`. A managed account name ends with `$` |
 | Error 1053 at start | Interpreter did not start: Python moved or removed, or not readable by the service account; run `hfm-service check` |
 | `Test-ADServiceAccount`: "The server has rejected the client credentials" | Signed in with a local account (`whoami`), or the account is an ordinary user (see "Which account") |
+| `pip install`: SSL error / "could not fetch URL https://pypi.org/..." | No internet access to PyPI from the server: offline install, step 3b |
+| Offline upgrade: pip says "already satisfied", old behaviour remains | Add `--force-reinstall` (step 10) |
 | Log: "maintenance.yaml changed but is invalid" | The edit was rejected and the previous windows still apply; fix the file (reason in the log) |
 | Every check Unknown | Monitoring access missing (A07-A10) or WebLogic secret not set (step 6); reasons in the log |
