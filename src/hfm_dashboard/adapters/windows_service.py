@@ -36,6 +36,8 @@ log = logging.getLogger("hfm_dashboard.service")
 FALLBACK_STOP_SECONDS = 30
 ERROR_ACCESS_DENIED = 5
 ERROR_SERVICE_DOES_NOT_EXIST = 1060
+ERROR_NONE_MAPPED = 1332
+SERVICE_LOGON_RIGHT = "SeServiceLogonRight"
 
 _options: ServiceOptions | None = None
 
@@ -146,13 +148,32 @@ class PywinServiceControl:
         return ServiceInfo(state=_STATES.get(status[1], str(status[1])), command_line=cfg[3],
                            account=cfg[7], start_type=_START_TYPES.get(cfg[1], str(cfg[1])))
 
+    def grant_service_logon(self, account: str) -> None:
+        import win32security
+        try:
+            sid, _, _ = win32security.LookupAccountName(None, account)
+        except pywintypes.error as exc:
+            if exc.winerror == ERROR_NONE_MAPPED:
+                raise ServiceControlError(f"account {account!r} was not found (check the DOMAIN\\name "
+                                          "spelling)") from exc
+            raise _error(exc, "look up account") from exc
+        try:
+            policy = win32security.LsaOpenPolicy(None, win32security.POLICY_CREATE_ACCOUNT
+                                                 | win32security.POLICY_LOOKUP_NAMES)
+            try:
+                win32security.LsaAddAccountRights(policy, sid, [SERVICE_LOGON_RIGHT])
+            finally:
+                win32security.LsaClose(policy)
+        except pywintypes.error as exc:
+            raise _error(exc, "grant 'Log on as a service'") from exc
+
     def install(self, spec: ServiceSpec) -> None:
         try:
             win32serviceutil.InstallService(
                 f"{HfmMonitorService.__module__}.{HfmMonitorService.__name__}", spec.name, spec.display_name,
                 startType=win32service.SERVICE_AUTO_START, exeName=spec.command[0],
                 exeArgs=subprocess.list2cmdline(spec.command[1:]), description=spec.description,
-                delayedstart=spec.delayed_auto_start, userName=spec.account, password=None)
+                delayedstart=spec.delayed_auto_start, userName=spec.account, password=spec.password)
             win32evtlogutil.AddSourceToRegistry(spec.name, servicemanager.__file__)
         except pywintypes.error as exc:
             raise _error(exc, "install service") from exc

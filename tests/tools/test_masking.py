@@ -79,3 +79,9 @@ class TestLeftovers:
         found = leftovers("clweb01 at 192.0.2.1", pairs)
         assert "IPv4 address" in found
         assert all("clweb01" not in f.lower() for f in found)
+
+
+def test_environment_without_load_balancer():
+    env = env_with({"web_node_01": "clweb01.client-corp.invalid"}).model_copy(update={"load_balancer": None})
+    pairs = build_masks(env, [])
+    assert mask("wlsadm.client-corp.invalid clweb01", pairs) == "wls-admin.example.test web-node-01"

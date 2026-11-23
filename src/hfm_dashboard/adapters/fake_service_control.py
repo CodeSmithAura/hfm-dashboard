@@ -13,7 +13,9 @@ class FakeServiceControl:
         self.states: dict[str, str] = {}
         self.recovery: dict[str, tuple[list[int], int]] = {}
         self.calls: list[tuple[str, str]] = []
+        self.logon_rights: set[str] = set()
         self.fail_with = fail_with
+        self.fail_grant_with: ServiceControlError | None = None
 
     def _maybe_fail(self) -> None:
         if self.fail_with is not None:
@@ -25,6 +27,12 @@ class FakeServiceControl:
             return None
         return ServiceInfo(state=self.states[name], command_line=subprocess.list2cmdline(spec.command),
                            account=spec.account or "LocalSystem", start_type="auto")
+
+    def grant_service_logon(self, account: str) -> None:
+        self.calls.append(("grant_service_logon", account))
+        if self.fail_grant_with is not None:
+            raise self.fail_grant_with
+        self.logon_rights.add(account)
 
     def install(self, spec: ServiceSpec) -> None:
         self.calls.append(("install", spec.name))

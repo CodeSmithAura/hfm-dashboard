@@ -30,7 +30,8 @@ def build_masks(env: Environment, extra: Iterable[tuple[str, str]] = ()) -> list
             short, suffix = host.split(".", 1)
             pairs.setdefault(short.lower(), fake_short)
             pairs.setdefault(suffix.lower(), FAKE_DOMAIN)
-    for url, fake_short in ((env.load_balancer.url, "lb"), (env.weblogic.admin_url, "wls-admin")):
+    lb_url = env.load_balancer.url if env.load_balancer else ""
+    for url, fake_short in ((lb_url, "lb"), (env.weblogic.admin_url, "wls-admin")):
         host = (urlsplit(url).hostname or "").strip()
         if host:
             pairs.setdefault(host.lower(), f"{fake_short}.{FAKE_DOMAIN}")

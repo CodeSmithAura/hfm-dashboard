@@ -83,6 +83,11 @@ Start-Service HfmAvailabilityMonitor
 .venv\Scripts\hfm-service status | uninstall
 ```
 
+Interim, with an ordinary domain user as the service account (D33): `--account <DOMAIN>\<user>
+--ask-password` prompts for its password and hands it to Windows; update it in services.msc whenever
+it changes. `environments.yaml` may hold only the environments you can reach (e.g. NONPROD alone), and
+`load_balancer` may be left out where there is no front door (D34).
+
 Recovery delays, stop timeout and log retention come from rules.yaml `monitor_service`.
 
 ## Dashboard

@@ -122,6 +122,14 @@ class TestOnlyEnvironment:
         with pytest.raises(EnvironmentConfigError, match="not filled in"):
             parse_environments(yaml.safe_dump(data), repo_rules)
 
+    def test_nonprod_only_file_without_load_balancer_is_valid(self, repo_rules):
+        # interim set-up: production access not yet given, so the file holds NONPROD only (D34)
+        data = yaml.safe_load(FILLED)
+        del data["environments"]["PROD"]
+        assert "load_balancer" not in data["environments"]["NONPROD"]
+        cfg = parse_environments(yaml.safe_dump(data), repo_rules)
+        assert list(cfg.environments) == ["NONPROD"] and cfg.environments["NONPROD"].load_balancer is None
+
     def test_missing_environment(self, repo_rules):
         with pytest.raises(EnvironmentConfigError, match="'UAT' not found"):
             parse_environments(FILLED, repo_rules, only_environment="UAT")

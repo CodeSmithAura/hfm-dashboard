@@ -1,14 +1,16 @@
 # Status (update as things change)
 
-Last updated: 19 Nov 2026 (service smoke test)
+Last updated: 23 Nov 2026 (interim NONPROD-only set-up, domain user service account)
 
 ## Plan
 - Target go-live: 30 Nov 2026 (production), with shadow mode from 26 Nov.
 - Live schedule with forecast dates: `docs/delivery_plan.xlsx` (dates recalculate from actuals).
 - Build: slices 1-14 done and merged (collectors, poll loop, history, notices, email, dashboard);
   slices 17 (Windows service, smoke-tested) and 18 (maintenance file) merged 19 Nov (#9, #10).
-  Remaining: 16 login probe, 15 HTTPS + login.
-- Nothing has run against a real server yet: access A06-A11 still open; design sign-off A12 open.
+  Slice 19 (NONPROD-only, domain user service account) 23 Nov. Remaining: 16 login probe, 15 HTTPS + login.
+- Monitoring server (A06) provided 19 Nov. 23 Nov: production access delayed; the client gave access
+  to NONPROD only, with an ordinary domain user account instead of the gMSA (interim, D33 / D34, Q64).
+  Nothing has run against a real server yet; A09-A11 still open; design sign-off A12 open.
 
 ## Build progress
 
@@ -212,9 +214,26 @@ Last updated: 19 Nov 2026 (service smoke test)
     owners.yaml) too.
   - New rules keys `maintenance.windows_file` and `max_window_hours: 72` (ASSUMED Q63). Decision D32.
   - Committed (`970988b`, mockup move `656f9e8`), merged into `main` (pull request #10, `789b372`).
+- Slice 19 (23 Nov): interim NONPROD-only operation with a domain user service account, 794 tests passing.
+  - `hfm-service install --account DOMAIN\name --ask-password`: password prompted twice (not echoed),
+    asked only after the self-check passed, handed to the service manager, never printed, logged or in
+    `repr`. An ordinary user account without `--ask-password` is refused (error 1069 otherwise);
+    `--ask-password` for a gMSA / sMSA / LocalSystem is refused. Every named account is granted
+    'Log on as a service' locally before anything is registered (a mistyped account installs nothing).
+    Port `ServiceControl.grant_service_logon` (pywin32: LsaAddAccountRights); fake records it. Decision D33.
+  - `load_balancer` optional per environment: left out = no load-balancer probes, dashboard note "No
+    load balancer configured for this environment"; masking copes without it. The template leaves it
+    out for NONPROD. A NONPROD-only `environments.yaml` is valid (test). Decision D34.
+  - Runbook `docs/service_install.md`: "Which account" (managed vs ordinary user), domain sign-in
+    prerequisite, `{{MONITOR_ACCOUNT}}` placeholder, NONPROD secret example, password change (section 9),
+    switching to the managed account, "Interim: NONPROD only", new troubleshooting rows. Query Q64.
+  - Found on the server 23 Nov: `Test-ADServiceAccount` / `Install-ADServiceAccount` failed ("server
+    has rejected the client credentials", then "object could not be found") because the account given
+    is an ordinary user, not a managed account; `Invoke-Command -Credential` to a NONPROD node with
+    that account listed the HFM services (WinRM path and rights fine for that node).
 
 ### Git
-- All slices 1-14 are in `main` (latest merge: pull request #7, `c60ca9f`, 17 Nov). Merges use merge
+- Slices 1-14, 17 and 18 are in `main` (latest merge: pull request #11, `d69723e`, 19 Nov). Merges use merge
   commits so each slice commit stays visible.
 - Each new slice branches off `main` and merges back after review. Commit only after review.
 - No GitHub CLI on this workstation: pull requests are opened from a pre-filled compare link.
@@ -245,8 +264,11 @@ is domain-joined. Consequences and mitigations until then:
   monitoring team writes them into `config/maintenance.yaml` on the server (process to agree, Q63).
 
 ### Next steps (resume here)
-1. Shadow mode prep (26 Nov), once the monitoring server and gMSA exist (A06, A07): install per
-   `docs/service_install.md`, owners.yaml with the monitoring team only, agree the maintenance process (Q63).
+1. NONPROD on the monitoring server now (A06 provided): `environments.yaml` with the NONPROD block
+   only, install per `docs/service_install.md` with the domain user account and `--ask-password`
+   (D33), check the log; bring back `PROBLEM:` lines / Unknown reasons (node keys, not names). Then
+   shadow mode prep: owners.yaml with the monitoring team only, agree the maintenance process (Q63).
+   Ask the client Q64 (permanent account, password expiry) and when production access comes.
 2. Decide Q55 (secret store) before go-live; until then the WebLogic secret sits in the service's
    registry Environment value (readable by local users).
 3. When masked outputs arrive: add them to `tests/fixtures/` (winrm, weblogic, sql) and run the parse
@@ -268,7 +290,8 @@ is domain-joined. Consequences and mitigations until then:
 - Monitoring account: WinRM read access and Event Log Readers on every server (A07), WebLogic Monitor
   role (A09), SQL VIEW SERVER STATE + msdb read (A10). ODBC Driver 18 on the monitoring server.
 - Always deploy `config/rules.yaml` together with the code (new keys are required at start-up).
-- Python 3.12 for all users on the monitoring server; gMSA with Log on as a service; install steps in
+- Python 3.12 for all users on the monitoring server; service account (gMSA planned, interim domain
+  user with `--ask-password`, D33) - install grants Log on as a service; install steps in
   `docs/service_install.md`. Shadow mode: owners.yaml lists only the monitoring team.
 
 ## Decisions pending
@@ -277,8 +300,8 @@ is domain-joined. Consequences and mitigations until then:
 ## Access and inputs still open (blocks running against production, not the build)
 | Item | Action / query |
 |---|---|
-| Monitoring server (VM) | A06 |
-| Read-only gMSA with WinRM rights + firewall rules | A07, A08 |
+| Monitoring server (VM) | A06 - provided 19 Nov |
+| Read-only gMSA with WinRM rights + firewall rules | A07, A08 - interim: domain user account, NONPROD only (D33, Q64); production access delayed |
 | WebLogic read-only monitor user | A09 |
 | SQL Server read-only login (VIEW SERVER STATE, msdb read) | A10 |
 | Test user for the login probe | A11, Q20 |

@@ -12,6 +12,7 @@ from hfm_dashboard.config.environment_loader import parse_environments
 from hfm_dashboard.domain.notices import MaintenanceWindow, Notice, NoticeKind
 from hfm_dashboard.presentation.dashboard import (
     CONTRACT_VERSION,
+    NO_LB_NOTE,
     as_dict,
     build_dashboard,
     duration_text,
@@ -65,6 +66,12 @@ class TestHealthy:
             ("Foundation / Shared Services (Workspace)", "/workspace/", "up"), ("HFM Web", "/hfmadf/", "up"),
             ("Financial Reporting Web", "/hr/", "up")]
         assert {s.id: s.pct_text for s in v.component_scores}["epmhfm"] == "100%"
+        assert v.lb_note == "Shown, not scored until Q57 is answered"
+
+    def test_environment_without_load_balancer(self, envs, repo_rules):
+        snap = snapshots(envs["NONPROD"], repo_rules, name="NONPROD")
+        v = view(envs, repo_rules, snap, env="NONPROD")
+        assert v.load_balancer == () and v.lb_note == NO_LB_NOTE
 
 
 class TestProblems:
