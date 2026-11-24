@@ -29,6 +29,38 @@ def prober(handler, step=0.25, **kw) -> HttpxUrlProber:
     return HttpxUrlProber(60, transport=httpx.MockTransport(handler), clock=Clock(step), **kw)
 
 
+def capture_client_kwargs(monkeypatch, module):
+    """Record the keyword arguments each httpx.Client in ``module`` is built with (then build it)."""
+    seen: list[dict] = []
+    real = httpx.Client
+
+    def client(**kwargs):
+        seen.append(kwargs)
+        return real(**kwargs)
+
+    monkeypatch.setattr(module.httpx, "Client", client)
+    return seen
+
+
+def test_proxy_from_environment_is_never_used(monkeypatch):
+    """D35: the web nodes are internal. httpx skips environment proxies whenever a transport is
+    given (as in these tests), so the setting itself is checked - and that httpx honours it."""
+    from hfm_dashboard.adapters import http_probe
+
+    seen = capture_client_kwargs(monkeypatch, http_probe)
+    assert prober(lambda r: httpx.Response(200)).probe(URL).http_status == 200
+    assert seen[0]["trust_env"] is False
+
+
+def test_httpx_without_trust_env_ignores_proxy_variables(monkeypatch):
+    for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+        monkeypatch.setenv(var, "http://proxy.example.test:3128")
+    with httpx.Client(trust_env=True) as c:
+        assert any(t is not None for t in c._mounts.values())          # would route via the proxy
+    with httpx.Client(trust_env=False) as c:
+        assert not any(t is not None for t in c._mounts.values())      # direct
+
+
 class TestProbe:
     def test_ok_with_elapsed_time(self):
         obs = prober(lambda r: httpx.Response(200, text="<html/>"), step=1.5).probe(URL)

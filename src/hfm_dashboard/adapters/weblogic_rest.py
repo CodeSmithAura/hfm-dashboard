@@ -58,6 +58,7 @@ class WeblogicRestSource:
                 auth=(self._credential.username, self._credential.password),
                 timeout=self._timeout,
                 verify=verify_setting(self._verify),
+                trust_env=False,   # never a proxy from the environment / account settings (D35)
                 transport=self._transport,
                 headers={"Accept": "application/json", "X-Requested-By": "hfm-dashboard"},
             ) as client:

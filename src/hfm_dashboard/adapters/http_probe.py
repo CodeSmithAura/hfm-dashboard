@@ -45,6 +45,7 @@ class HttpxUrlProber:
                 timeout=self._timeout,
                 verify=verify_setting(self._verify),
                 follow_redirects=False,
+                trust_env=False,   # never a proxy from the environment / account settings (D35)
                 transport=self._transport,
                 headers={"User-Agent": "hfm-availability-monitor"},
             ) as client:
