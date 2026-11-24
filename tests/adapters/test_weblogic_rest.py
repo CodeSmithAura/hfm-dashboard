@@ -25,6 +25,16 @@ def source(handler, **kw) -> WeblogicRestSource:
     return WeblogicRestSource(ADMIN, CRED, timeout_seconds=20, transport=httpx.MockTransport(handler), **kw)
 
 
+def test_proxy_from_environment_is_never_used(monkeypatch):
+    """D35: the Admin Server is internal; a proxy from the environment must not be used."""
+    from hfm_dashboard.adapters import weblogic_rest
+    from tests.adapters.test_http_probe import capture_client_kwargs
+
+    seen = capture_client_kwargs(monkeypatch, weblogic_rest)
+    assert source(lambda r: httpx.Response(200, json=sample("domain_all_running.json"))).fetch_servers()
+    assert seen[0]["trust_env"] is False
+
+
 class TestRequest:
     def test_single_read_only_search_request(self):
         seen: list[httpx.Request] = []

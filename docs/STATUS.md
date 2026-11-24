@@ -1,6 +1,6 @@
 # Status (update as things change)
 
-Last updated: 23 Nov 2026 (interim NONPROD-only set-up, domain user service account)
+Last updated: 24 Nov 2026 (first run on the monitoring server against NONPROD; no-proxy fix D35)
 
 ## Plan
 - Target go-live: 30 Nov 2026 (production), with shadow mode from 26 Nov.
@@ -231,6 +231,20 @@ Last updated: 23 Nov 2026 (interim NONPROD-only set-up, domain user service acco
     has rejected the client credentials", then "object could not be found") because the account given
     is an ordinary user, not a managed account; `Invoke-Command -Credential` to a NONPROD node with
     that account listed the HFM services (WinRM path and rights fine for that node).
+  - Committed (`2c552c4`), merged into `main` (pull request #12); offline runbook pull request #13;
+    release `v0.1.0` with an offline wheelhouse.
+- Server run 24 Nov (NONPROD, real servers, first time): PyPI access granted, `pip install .` worked.
+  `--ask-password` could not be used: the hidden prompt shows a blank line in ISE, and the plain console
+  of the user's remote session takes no typing (paste only). Workaround: install without `--account`,
+  then set the account and password in services.msc (grants Log on as a service). Service running,
+  polls logged, dashboard served. All eight ports open from the monitoring server. Findings:
+  - WinRM checks on every node "not reachable (ConnectionError)" with correct settings -> proxy taken
+    from the service account's settings; fixed by D35 (below).
+  - HFM Web `/hfmadf/` answers HTTP 500 directly (Workspace and FR Web 200): probe path or a real HFM
+    Web error - to confirm whether users can work, then pick a path answering 200 / 302.
+  - WebLogic and SQL Unknown: credentials / rights not received yet (A09, A10).
+- Fix (24 Nov, D35): no proxy for WinRM, URL probes and WebLogic REST; tests fail without the fix,
+  798 tests passing.
 
 ### Git
 - Slices 1-14, 17 and 18 are in `main` (latest merge: pull request #11, `d69723e`, 19 Nov). Merges use merge
@@ -264,9 +278,10 @@ is domain-joined. Consequences and mitigations until then:
   monitoring team writes them into `config/maintenance.yaml` on the server (process to agree, Q63).
 
 ### Next steps (resume here)
-1. NONPROD on the monitoring server now (A06 provided): `environments.yaml` with the NONPROD block
-   only, install per `docs/service_install.md` with the domain user account and `--ask-password`
-   (D33), check the log; bring back `PROBLEM:` lines / Unknown reasons (node keys, not names). Then
+1. NONPROD on the monitoring server (service running since 24 Nov): deploy the D35 fix (`git pull`,
+   `pip install .`, restart) and confirm the WinRM checks turn Up; settle the HFM Web probe path
+   (HTTP 500 at `/hfmadf/`); WebLogic / SQL once A09 / A10 arrive. Possible follow-up: `hfm-service`
+   password entry that works without a console (ISE, paste-only sessions) - offered, not started. Then
    shadow mode prep: owners.yaml with the monitoring team only, agree the maintenance process (Q63).
    Ask the client Q64 (permanent account, password expiry) and when production access comes.
 2. Decide Q55 (secret store) before go-live; until then the WebLogic secret sits in the service's

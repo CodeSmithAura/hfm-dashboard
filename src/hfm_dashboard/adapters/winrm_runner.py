@@ -60,6 +60,9 @@ class WinRMRunner:
             "connection_timeout": self._timeout,
             "operation_timeout": self._timeout,
             "read_timeout": self._timeout + 5,   # must exceed operation_timeout (WinRM requirement)
+            # Always connect directly (D35): the nodes are internal, and a proxy from the service
+            # account's settings (often set by group policy) would turn every check into a ConnectionError.
+            "no_proxy": True,
         }
         if self._credential is not None:
             kwargs["username"] = self._credential.username

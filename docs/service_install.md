@@ -197,7 +197,7 @@ Stop-Service HfmAvailabilityMonitor
 Start-Service HfmAvailabilityMonitor
 ```
 
-Offline, `--force-reinstall` is required while the version number stays the same (0.1.0): without
+Offline, `--force-reinstall` is required when the version number has not changed (`pip show hfm-dashboard`): without
 it pip reports "already satisfied" and keeps the old code.
 
 Uninstall and install again if the Python installation, the folders, the account or the recovery
@@ -245,4 +245,6 @@ changes when PROD is added later.
 | `pip install`: SSL error / "could not fetch URL https://pypi.org/..." | No internet access to PyPI from the server: offline install, step 3b |
 | Offline upgrade: pip says "already satisfied", old behaviour remains | Add `--force-reinstall` (step 10) |
 | Log: "maintenance.yaml changed but is invalid" | The edit was rejected and the previous windows still apply; fix the file (reason in the log) |
+| WinRM checks "not reachable (ConnectionError)" although `Test-NetConnection` to the WinRM port succeeds | Check `winrm.port` / `use_ssl` (5985 = false, 5986 = true). Before release 0.1.1 also a proxy from the service account's settings (D35): upgrade |
+| URL check "HTTP 500" | The server itself answered with an error: repeat with `curl.exe -s -o NUL -w "%{http_code}" --noproxy "*" <url>`. If users can work normally, the probe path is not a valid page on its own: choose a path that answers 200 / 302 (`url_probes` in environments.yaml, restart). Otherwise the error is in that managed server's log on the web node |
 | Every check Unknown | Monitoring access missing (A07-A10) or WebLogic secret not set (step 6); reasons in the log |

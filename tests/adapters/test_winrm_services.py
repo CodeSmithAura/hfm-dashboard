@@ -155,6 +155,22 @@ class TestWinRMSource:
         assert client.wsman.operation_timeout == 20
         assert client.wsman.transport.read_timeout > 20
 
+    def test_proxy_from_environment_is_never_used(self, monkeypatch):
+        """D35: a proxy in the account's environment (here: variables) must not carry WinRM traffic."""
+        from hfm_dashboard.adapters.winrm_services import _default_client_factory
+
+        for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+            monkeypatch.setenv(var, "http://proxy.example.test:3128")
+        for var in ("NO_PROXY", "no_proxy"):
+            monkeypatch.delenv(var, raising=False)
+        src = WinRMServiceSource(WinRM(port=5985, use_ssl=False, auth="negotiate"), timeout_seconds=20)
+        assert src._client_kwargs()["no_proxy"] is True
+        client = _default_client_factory("web-node-01.example.test", **src._client_kwargs())
+        session = client.wsman.transport._build_session()        # offline: builds the requests session
+        endpoint = client.wsman.transport.endpoint
+        proxies = session.rebuild_proxies(__import__("requests").Request("POST", endpoint).prepare(), session.proxies)
+        assert proxies.get("http") is False                      # requests: False = connect directly
+
     def test_explicit_credential_passed_but_hidden_in_repr(self):
         cred = Credential("dev-user", "s3cret-value")
         factory = Factory(FakeClient(sample("single_object.json")))
