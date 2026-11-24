@@ -127,6 +127,41 @@ def boot_script() -> Path:
     return Path(__file__).resolve().parents[1] / "service_boot.py"
 
 
+def user_profiles_dir() -> Path | None:
+    """The folder holding every user's profile (normally C:\\Users), from the registry; None if unknown."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList") as key:
+            value, _ = winreg.QueryValueEx(key, "ProfilesDirectory")
+        import os
+        return Path(os.path.expandvars(value))
+    except (ImportError, OSError):
+        return None
+
+
+def profile_problems(paths: dict[str, Path], profiles_dir: Path | None) -> list[str]:
+    """Paths the service needs that lie inside a user profile (D36).
+
+    The service runs as its own account, which cannot read another person's profile: a Python
+    installed "for me only" or a folder under C:\\Users works while testing as yourself and fails once
+    the service runs (error 1053, or the service silently left on LocalSystem)."""
+    if profiles_dir is None:
+        return []
+    root = Path(profiles_dir).resolve()
+    problems = []
+    for what, path in paths.items():
+        try:
+            Path(path).resolve().relative_to(root)
+        except ValueError:
+            continue
+        problems.append(f"{what} is inside a user profile ({root}): the service account cannot read it there. "
+                        + ("Install Python 3.12 'for all users' (e.g. C:\\Program Files\\Python312) and recreate "
+                           "the venv from it" if what == "interpreter"
+                           else "Use a folder outside the profiles, e.g. on a data drive"))
+    return problems
+
+
 def load_service_rules(options: ServiceOptions) -> tuple[Rules | None, str | None]:
     try:
         return load_rules(options.config_dir / RULES_FILE), None

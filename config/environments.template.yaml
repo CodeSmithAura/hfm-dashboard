@@ -172,7 +172,7 @@ environments:
       port: sql                      # key in ports above
       auth: windows                  # windows = the service account (no password here); sql = secrets.sql_monitor_login
       encrypt: true
-      trust_server_certificate: false
+      trust_server_certificate: false  # true only for a self-signed NONPROD certificate (runbook step 6, Q65)
 
     services:                        # all discovered on the development hosts
       ohs_load_balancer: { web_node_01: "OHS" }

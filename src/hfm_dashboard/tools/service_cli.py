@@ -31,7 +31,7 @@ from typing import TextIO
 
 from hfm_dashboard.app.service_host import (
     CHECK_FLAG, DESCRIPTION, DISPLAY_NAME, SERVICE_NAME, ServiceOptions, boot_script, command_line,
-    interpreter_paths, load_service_rules, service_command,
+    interpreter_paths, load_service_rules, profile_problems, service_command, user_profiles_dir,
 )
 from hfm_dashboard.config.startup import ConfigurationError, load_configuration
 from hfm_dashboard.ports.service_control import (
@@ -73,6 +73,8 @@ def _parser() -> argparse.ArgumentParser:
         s.add_argument("--ui-dir", type=Path)
         s.add_argument("--env", action="append", help="only this environment (repeatable)")
         s.add_argument("--no-web", action="store_true")
+        s.add_argument("--allow-user-profile", action="store_true",
+                       help="testing on a workstation only: accept Python or folders inside a user profile")
         if name == "install":
             s.add_argument("--account", help=r"service account, e.g. a gMSA: DOMAIN\name$ (default LocalSystem)")
             s.add_argument("--ask-password", action="store_true",
@@ -85,7 +87,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None, *, control: ServiceControl | None = None,
          runner: Runner = run_command, out: TextIO | None = None,
-         ask_password: AskPassword = getpass.getpass) -> int:
+         ask_password: AskPassword = getpass.getpass,
+         profiles_dir: Callable[[], Path | None] = user_profiles_dir) -> int:
     out = out or sys.stdout
     a = _parser().parse_args(argv)
     try:
@@ -100,7 +103,8 @@ def main(argv: list[str] | None = None, *, control: ServiceControl | None = None
                 if problem:
                     print(f"PROBLEM: {problem}", file=out)
                     return 2
-            ok = _check(options, runner, out)
+            ok = _check(options, runner, out,
+                        profiles=None if a.allow_user_profile else profiles_dir())
             if a.command == "check" or not ok:
                 return 0 if ok else 2
             password = None
@@ -146,13 +150,23 @@ def _read_password(account: str, ask_password: AskPassword, out: TextIO) -> str 
     return first
 
 
-def _check(options: ServiceOptions, runner: Runner, out: TextIO) -> bool:
+def _check(options: ServiceOptions, runner: Runner, out: TextIO, profiles: Path | None = None) -> bool:
     try:
         load_configuration(options.config_dir)
     except ConfigurationError as exc:
         print(f"PROBLEM: {exc}", file=out)
         return False
     exe, site_dir = interpreter_paths()
+    paths = {"interpreter": exe, "monitor code": site_dir, "config folder": options.config_dir,
+             "data folder": options.data_dir, "log folder": options.log_dir}
+    if options.ui_dir is not None:
+        paths["ui folder"] = options.ui_dir
+    problems = profile_problems(paths, profiles)
+    for p in problems:
+        print(f"PROBLEM: {p}", file=out)
+    if problems:
+        print("(only for a test on your own workstation: add --allow-user-profile)", file=out)
+        return False
     args = service_command(exe, boot_script(), site_dir, options)
     check = [*args[:5], CHECK_FLAG, *args[5:]]
     code, text = runner(check)

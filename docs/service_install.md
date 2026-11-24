@@ -23,8 +23,11 @@ ordinary user skip `Install-ADServiceAccount` / `Test-ADServiceAccount` - they a
 
 ## 1. Prerequisites
 
-- Python 3.12 64-bit, installed for all users (the service runs this interpreter directly, so it must
-  not sit in a person's profile folder). ODBC Driver 18 for SQL Server.
+- Python 3.12 64-bit, installed **for all users** (installer > Customize installation > "Install
+  Python 3.12 for all users", location `C:\Program Files\Python312\`). The service runs this
+  interpreter directly as its own account, which cannot read a Python installed "for me only" in your
+  profile; `hfm-service check` refuses that (D36). Check: `& "{{PYTHON_EXE}}" -c "import sys;
+  print(sys.base_prefix)"` must not be under `C:\Users`. ODBC Driver 18 for SQL Server.
 - Run every step below signed in with a **domain** account that is a local administrator on this
   server (`whoami` shows `DOMAIN\you`, not `SERVER\...`), in an elevated PowerShell.
 - Managed account only: it is installed on this server and works: `Test-ADServiceAccount <name>`
@@ -114,27 +117,53 @@ The Python installation folder is readable by all users by default; check if it 
 
 ## 6. Secrets (interim until Q55)
 
-WinRM and SQL Server use the service account itself, so no password is stored for them. The WebLogic
-Monitor user is read from environment variables named after `secrets:` in `environments.yaml`:
-`HFM_MON_<ENV>_WEBLOGIC_USERNAME` / `_PASSWORD`, e.g. `HFM_MON_NONPROD_WEBLOGIC_USERNAME`. Give them to
-the service only (not machine-wide), after step 7. Example for NONPROD (for both environments, list
-all four values):
+WinRM uses the service account itself (no password stored). Credentials for WebLogic, and for SQL
+Server when it uses a SQL login (`sql.auth: sql`), are read from environment variables named after
+the `secrets:` entries in `environments.yaml`: every non-alphanumeric character becomes `_`, upper
+case, plus `_USERNAME` / `_PASSWORD`:
+
+| Secret (environments.yaml) | Variables |
+|---|---|
+| `weblogic_monitor_user: "hfm-mon/NONPROD/weblogic"` | `HFM_MON_NONPROD_WEBLOGIC_USERNAME`, `HFM_MON_NONPROD_WEBLOGIC_PASSWORD` |
+| `sql_monitor_login: "hfm-mon/NONPROD/sql"` (only with `sql.auth: sql`) | `HFM_MON_NONPROD_SQL_USERNAME`, `HFM_MON_NONPROD_SQL_PASSWORD` |
+
+Give them to the service only (not machine-wide), after step 7, in the service's registry
+`Environment` value. Use PowerShell ISE or a normal window **as administrator**; `Read-Host
+-AsSecureString` opens a dialog in ISE, and paste works there. This script **adds or replaces one
+secret and keeps the others** - run it once per secret; set `$prefix` first:
 
 ```powershell
+$prefix = 'HFM_MON_NONPROD_SQL'          # or HFM_MON_NONPROD_WEBLOGIC, HFM_MON_PROD_WEBLOGIC, ...
 $key  = 'HKLM:\SYSTEM\CurrentControlSet\Services\HfmAvailabilityMonitor'
-$user = Read-Host 'WebLogic monitor user'
-$pw   = Read-Host 'WebLogic monitor password' -AsSecureString
-$plain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
-New-ItemProperty -Path $key -Name Environment -PropertyType MultiString -Force -Value @(
-  "HFM_MON_NONPROD_WEBLOGIC_USERNAME=$user", "HFM_MON_NONPROD_WEBLOGIC_PASSWORD=$plain")
-Remove-Variable plain, pw
+$user = Read-Host "$prefix user"
+$pw   = Read-Host "$prefix password" -AsSecureString
+$plain = [Net.NetworkCredential]::new('', $pw).Password
+# @( ... ) around the whole pipeline: without it an empty result turns the next line into one glued string
+$keep = @((Get-ItemProperty $key -Name Environment -ErrorAction SilentlyContinue).Environment |
+          Where-Object { $_ -and $_ -notlike "${prefix}_*" })
+$values = $keep + @("${prefix}_USERNAME=$user", "${prefix}_PASSWORD=$plain")
+New-ItemProperty -Path $key -Name Environment -PropertyType MultiString -Force -Value $values
+Remove-Variable plain, pw, values
+
+# check - names only, never the values: each secret must show as TWO lines (_USERNAME and _PASSWORD)
+(Get-ItemProperty $key -Name Environment).Environment | ForEach-Object { ($_ -split '=', 2)[0] }
+Restart-Service HfmAvailabilityMonitor   # read at service start; no server restart needed
 ```
 
 Limitation: the value is stored in the registry in plain text, readable by local users. Acceptable
 for shadow mode on a server only admins can log on to; Q55 (secret store) must be decided before
-go-live. Without this value the service still runs: the WebLogic check (Admin Server, Foundation /
+go-live. The value is removed with the service (uninstall) and must be set again after a reinstall.
+Without the WebLogic value the service still runs: the WebLogic check (Admin Server, Foundation /
 Shared Services) shows Unknown, those nodes drop out of the score, and a stopped Windows service is
 still detected.
+
+**SQL Server certificate.** ODBC Driver 18 encrypts and verifies the SQL Server's certificate
+(`encrypt: true`, `trust_server_certificate: false`). A self-signed certificate - usual on
+non-production - fails with "SQL Server not reachable" (ODBC: "The certificate chain was issued by an
+authority that is not trusted"). NONPROD interim: `trust_server_certificate: true` (still encrypted,
+the server's identity is not checked). PROD: keep `false` and have the issuing root certificate
+trusted on the monitoring server, with the host name in `environments.yaml` matching the
+certificate (Q65).
 
 ## 7. Check, install, start (elevated PowerShell)
 
@@ -148,18 +177,32 @@ $opts = '--config-dir', '{{INSTALL_ROOT}}\config', '--data-dir', '{{INSTALL_ROOT
 # OR interim ordinary user account (D33) - prompts twice for its password, nothing is echoed or saved in a file:
 .venv\Scripts\hfm-service install @opts --account 'DOMAIN\name' --ask-password
 
-# (step 6 now, if WebLogic credentials are available)
+# (step 6 now, if credentials are available)
 Start-Service HfmAvailabilityMonitor
 ```
 
-`install` refuses if the configuration is invalid or the self-check fails, and refuses an ordinary
-user account without `--ask-password` (it could not log on). It grants the account **Log on as a
-service** (before anything is registered, so a mistyped account installs nothing), registers
-automatic (delayed) start, Windows recovery actions from `rules.yaml monitor_service` (restart after
-60 / 120 / 300 s) and the event log source. The password is asked for only after the self-check passed
-and goes straight to Windows (stored like any service password, as an LSA secret). The self-check
-runs as **you**, not as the service account: folder rights and remote access of the service account
-show up only once the service runs (step 8).
+`check` and `install` refuse if the configuration is invalid, if the Python interpreter or a folder
+lies inside a user profile (D36 - e.g. Python installed "for me only"; the service account cannot read
+it), or if the self-check fails. `install` also refuses an ordinary user account without
+`--ask-password` (it could not log on). It grants the account **Log on as a service** (before
+anything is registered, so a mistyped account installs nothing), registers automatic (delayed) start,
+Windows recovery actions from `rules.yaml monitor_service` (restart after 60 / 120 / 300 s) and the
+event log source. The password is asked for only after the checks passed and goes straight to
+Windows (stored like any service password, as an LSA secret). The self-check runs as **you**, not as
+the service account: folder rights and remote access of the service account show up only once the
+service runs (step 8). For a test on your own workstation only, `--allow-user-profile` skips the
+profile check.
+
+**If the password prompt does not work** (it shows a blank line, or the console takes no typing -
+PowerShell ISE, some remote-access tools): install without `--account`, then set the account in
+services.msc, where paste works:
+
+1. `.venv\Scripts\hfm-service install @opts` (registers it as LocalSystem; ignore that warning; do not
+   start it).
+2. services.msc > HFM Availability Monitor > **Log On** > This account `DOMAIN\name` > password twice
+   > OK. Windows grants **Log On As A Service** itself.
+3. Step 5 (`icacls`) for that account, `Start-Service HfmAvailabilityMonitor`, then
+   `hfm-service status` must show the account (not LocalSystem).
 
 ## 8. Verify
 
@@ -227,6 +270,9 @@ changes when PROD is added later.
   URL, add the block with that URL instead.
 - NONPROD notices are logged only (`notices_enabled: false`); nothing is emailed.
 - The WebLogic secret uses the NONPROD names (step 6). Without it see the limitation in step 6.
+- SQL Server: if the client gives a SQL login instead of rights for the service account, set
+  `sql.auth: sql` and the `HFM_MON_NONPROD_SQL_*` secret (step 6). A self-signed SQL certificate
+  needs `trust_server_certificate: true` for NONPROD (step 6, "SQL Server certificate").
 - The application login check (slice 16) is not built yet; today's URL checks use no credentials.
 - Personal credentials only for temporary testing, never for the service (D11).
 
@@ -245,6 +291,13 @@ changes when PROD is added later.
 | `pip install`: SSL error / "could not fetch URL https://pypi.org/..." | No internet access to PyPI from the server: offline install, step 3b |
 | Offline upgrade: pip says "already satisfied", old behaviour remains | Add `--force-reinstall` (step 10) |
 | Log: "maintenance.yaml changed but is invalid" | The edit was rejected and the previous windows still apply; fix the file (reason in the log) |
-| WinRM checks "not reachable (ConnectionError)" although `Test-NetConnection` to the WinRM port succeeds | Check `winrm.port` / `use_ssl` (5985 = false, 5986 = true). Before release 0.1.1 also a proxy from the service account's settings (D35): upgrade |
+| WinRM checks "not reachable (ConnectionError)" although `Test-NetConnection` to the WinRM port succeeds | Check `hfm-service status`: account LocalSystem means the account change never took effect (row "Service runs, but as LocalSystem"). Check `winrm.port` / `use_ssl` (5985 = false, 5986 = true). Before release 0.1.1 also a proxy from the service account's settings (D35): upgrade |
+| `check` / `install`: "interpreter is inside a user profile" | Python was installed "for me only". Install it for all users, `python -m venv .venv --clear` from that Python, `pip install .`, uninstall and install the service, set the account again (D36) |
+| Service runs, but as LocalSystem although an account was set in services.msc | The service could not start as that account (often: Python in a profile, error 1053) and an older LocalSystem run was still going, or it was never restarted. `hfm-service status`, then `Restart-Service` and check the log |
+| WinRM "authentication failed" / your own test gives 401 | That account has no WinRM rights on the node: Remote Management Users and Event Log Readers on every node. Test as the service account itself (sign in as it, or `Get-Credential`), not as yourself |
+| The password prompt shows a blank line, or the console takes no typing | PowerShell ISE / remote console: use the services.msc route in step 7 |
+| Log: "secret '...' not set" although it was set | Names in step 6 check: each secret needs a `_USERNAME` and a `_PASSWORD` line; then `Restart-Service` |
+| SQL "SQL Server not reachable" with the SQL port open | Usually the SQL certificate is not trusted (self-signed): step 6, "SQL Server certificate" |
+| SQL "SQL Server login failed" | SQL login name / password wrong or not enabled; with `auth: windows` the service account has no SQL login |
 | URL check "HTTP 500" | The server itself answered with an error: repeat with `curl.exe -s -o NUL -w "%{http_code}" --noproxy "*" <url>`. If users can work normally, the probe path is not a valid page on its own: choose a path that answers 200 / 302 (`url_probes` in environments.yaml, restart). Otherwise the error is in that managed server's log on the web node |
 | Every check Unknown | Monitoring access missing (A07-A10) or WebLogic secret not set (step 6); reasons in the log |
