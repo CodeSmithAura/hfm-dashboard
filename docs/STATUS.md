@@ -1,6 +1,6 @@
 # Status (update as things change)
 
-Last updated: 24 Nov 2026 (first run on the monitoring server against NONPROD; no-proxy fix D35)
+Last updated: 24 Nov 2026 (NONPROD running on the monitoring server, 85%; install hardening slice 20)
 
 ## Plan
 - Target go-live: 30 Nov 2026 (production), with shadow mode from 26 Nov.
@@ -238,16 +238,42 @@ Last updated: 24 Nov 2026 (first run on the monitoring server against NONPROD; n
   of the user's remote session takes no typing (paste only). Workaround: install without `--account`,
   then set the account and password in services.msc (grants Log on as a service). Service running,
   polls logged, dashboard served. All eight ports open from the monitoring server. Findings:
-  - WinRM checks on every node "not reachable (ConnectionError)" with correct settings -> proxy taken
-    from the service account's settings; fixed by D35 (below).
+  - WinRM checks on every node "not reachable (ConnectionError)" with correct settings. First suspected
+    a proxy from the service account's settings (fixed anyway by D35, below); the real cause was found
+    after it: see the evening findings.
   - HFM Web `/hfmadf/` answers HTTP 500 directly (Workspace and FR Web 200): probe path or a real HFM
     Web error - to confirm whether users can work, then pick a path answering 200 / 302.
   - WebLogic and SQL Unknown: credentials / rights not received yet (A09, A10).
 - Fix (24 Nov, D35): no proxy for WinRM, URL probes and WebLogic REST; tests fail without the fix,
-  798 tests passing.
+  798 tests passing. Committed (`4c9b031`), merged into `main` (pull request #14, `494f1ee`), version 0.1.1.
+- Server findings 24 Nov evening (after 0.1.1):
+  - Root cause of the WinRM failures: Python had been installed "for me only" in the admin's profile.
+    The service account cannot read it, so the account change in services.msc never took effect and the
+    service kept running as LocalSystem (no WinRM rights on the nodes). Fixed on the server: Python 3.12
+    for all users, venv recreated, `pip install .`, service reinstalled, account set in services.msc.
+  - Diagnosis: a pypsrp test script run as yourself gives 401 (no rights - expected), run signed in as
+    the service account gives OK. WinRM checks (services, disk, event log) now Up on all three nodes.
+  - SQL: the SQL team created a SQL login (not the AD account): `sql.auth: sql` and secret
+    `HFM_MON_NONPROD_SQL_*` in the service's registry Environment value. A first script glued username and
+    password into one value (empty list in PowerShell); corrected merge-safe script now in runbook step 6.
+    Then "SQL Server not reachable": ODBC "certificate chain ... not trusted" (self-signed) ->
+    NONPROD `trust_server_certificate: true`; PROD question Q65. SQL Server now Up.
+  - State: NONPROD 85% Amber. Open: WebLogic (Monitor user, A09) and HFM Web HTTP 500 at `/hfmadf/`
+    (user to ask whether HFM works for users; then choose a probe path answering 200 / 302).
+- Slice 20 (24 Nov): install hardening, 805 tests passing.
+  - `hfm-service check` / `install` refuse an interpreter, the monitor code or a config / data / log
+    folder inside the user profiles folder (registry ProfileList), before anything runs;
+    `--allow-user-profile` for workstation tests only. Decision D36. Verified against this workstation's
+    per-user Python (refused; accepted with the override).
+  - Runbook: Python "for all users" with a check command (step 1); step 6 rewritten - secret names table
+    (WebLogic, SQL login), merge-safe script with a names-only check, service restart only, SQL
+    certificate section; step 7 - profile refusal, services.msc route when the password prompt does not
+    work; troubleshooting rows (profile Python, service left on LocalSystem, WinRM 401, blank prompt,
+    secret not set, SQL certificate, SQL login failed). Template comment on `trust_server_certificate`.
+    Query Q65 (PROD SQL certificate).
 
 ### Git
-- Slices 1-14, 17 and 18 are in `main` (latest merge: pull request #11, `d69723e`, 19 Nov). Merges use merge
+- Slices 1-14 and 17-19 plus the D35 fix are in `main` (latest merge: pull request #14, `494f1ee`, 24 Nov). Merges use merge
   commits so each slice commit stays visible.
 - Each new slice branches off `main` and merges back after review. Commit only after review.
 - No GitHub CLI on this workstation: pull requests are opened from a pre-filled compare link.
@@ -278,10 +304,10 @@ is domain-joined. Consequences and mitigations until then:
   monitoring team writes them into `config/maintenance.yaml` on the server (process to agree, Q63).
 
 ### Next steps (resume here)
-1. NONPROD on the monitoring server (service running since 24 Nov): deploy the D35 fix (`git pull`,
-   `pip install .`, restart) and confirm the WinRM checks turn Up; settle the HFM Web probe path
-   (HTTP 500 at `/hfmadf/`); WebLogic / SQL once A09 / A10 arrive. Possible follow-up: `hfm-service`
-   password entry that works without a console (ISE, paste-only sessions) - offered, not started. Then
+1. NONPROD on the monitoring server (running as the AD account, 85% Amber, WinRM and SQL Up): settle
+   the HFM Web probe path (HTTP 500 at `/hfmadf/`); WebLogic once the Monitor user arrives (A09; step 6
+   script with `$prefix = 'HFM_MON_NONPROD_WEBLOGIC'`). Possible follow-up: `hfm-service` password entry
+   that works without a console (ISE, paste-only sessions) - offered, not started. Then
    shadow mode prep: owners.yaml with the monitoring team only, agree the maintenance process (Q63).
    Ask the client Q64 (permanent account, password expiry) and when production access comes.
 2. Decide Q55 (secret store) before go-live; until then the WebLogic secret sits in the service's

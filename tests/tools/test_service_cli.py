@@ -35,6 +35,7 @@ class Runner:
 def run(argv, **kw):
     out = io.StringIO()
     kw.setdefault("runner", Runner())
+    kw.setdefault("profiles_dir", lambda: None)   # guard off: test folders live in the tester's profile
     code = main(argv, out=out, **kw)
     return code, out.getvalue()
 
@@ -212,6 +213,62 @@ class TestAccounts:
 ])
 def test_needs_password(account, expected):
     assert needs_password(account) is expected
+
+
+class TestUserProfileGuard:
+    """D36: Python or folders inside a user profile are refused before anything runs or is installed."""
+
+    def test_folders_inside_profiles_refused(self, dirs, tmp_path):
+        fake, runner = FakeServiceControl(), Runner()
+        code, text = run(["install", *dirs], control=fake, runner=runner, profiles_dir=lambda: tmp_path)
+        assert code == 2
+        assert "config folder is inside a user profile" in text and "data folder" in text and "log folder" in text
+        assert "--allow-user-profile" in text
+        assert fake.calls == [] and runner.calls == []
+
+    def test_interpreter_inside_profile_names_the_fix(self, dirs, monkeypatch, tmp_path):
+        from hfm_dashboard.tools import service_cli
+
+        profiles = tmp_path / "Users"
+        monkeypatch.setattr(service_cli, "interpreter_paths",
+                            lambda: (profiles / "admin" / "AppData" / "Python312" / "python.exe",
+                                     tmp_path / "app" / ".venv" / "Lib" / "site-packages"))
+        code, text = run(["check", *dirs], profiles_dir=lambda: profiles)
+        assert code == 2 and "interpreter is inside a user profile" in text and "for all users" in text
+        assert "config folder" not in text                    # the folders are outside 'Users'
+
+    def test_outside_profiles_passes(self, dirs, tmp_path):
+        code, _ = run(["check", *dirs], profiles_dir=lambda: tmp_path / "Users")
+        assert code == 0
+
+    def test_override_for_workstation_tests(self, dirs, tmp_path):
+        fake = FakeServiceControl()
+        code, _ = run(["install", *dirs, "--allow-user-profile"], control=fake, profiles_dir=lambda: tmp_path)
+        assert code == 0 and SERVICE_NAME in fake.services
+
+    def test_unknown_profiles_folder_skips_the_guard(self, dirs):
+        assert run(["check", *dirs], profiles_dir=lambda: None)[0] == 0
+
+
+def test_profile_problems_pure(tmp_path):
+    from hfm_dashboard.app.service_host import profile_problems
+
+    users = tmp_path / "Users"
+    paths = {"interpreter": users / "a" / "python.exe", "data folder": tmp_path / "data",
+             "log folder": tmp_path / "Users2" / "logs"}                 # a sibling, not inside 'Users'
+    problems = profile_problems(paths, users)
+    assert len(problems) == 1 and problems[0].startswith("interpreter is inside a user profile")
+    assert profile_problems(paths, None) == []
+
+
+def test_user_profiles_dir_on_windows():
+    from hfm_dashboard.app.service_host import user_profiles_dir
+
+    found = user_profiles_dir()
+    if sys.platform == "win32":
+        assert found is not None and found.is_absolute() and "%" not in str(found)
+    else:
+        assert found is None
 
 
 class TestStatusAndUninstall:
